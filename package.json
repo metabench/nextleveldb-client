@@ -1,0 +1,27 @@
+{
+  "name": "nextleveldb-client",
+  "main": "nextleveldb-client.js",
+  "license": "MIT",
+  "dependencies": {
+    "jsgui3": "^0.0.8",
+    "level": ">= 1.5.0",
+    "moment": "^2.18.1",
+    "recursive-readdir": "^2.2.1",
+    "request": "^2.81.0",
+    "single-line-log": "^1.1.2",
+    "websocket": "^1.0.24",
+    "xas2": "^0.0.10",
+    "binary-encoding": "^0.0.29",
+    "nextleveldb-model": "^0.0.3"
+  },
+  "engines": {
+    "node": ">=8.5.0"
+  },
+  "description": "NextLevelDB Client",
+  "author": "James Vickers <james@metabench.com>",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/metabench/nextleveldb-client.git"
+  },
+  "version": "0.0.2"
+}
