@@ -25,7 +25,7 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
         var that = this;
         this.ll_get_core((err, buf_core) => {
             if (err) { callback(err); } else {
-                console.log('buf_core', buf_core);
+                //console.log('buf_core', buf_core);
                 that.model = Model_Database.load(buf_core);
                 callback(null, that.model);
 
@@ -48,7 +48,12 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
                     }
                 });
                 */
-                table.add_records_including_table_id_in_key(table_records, true);
+
+                // The get_table_records function won't have the id within the key.
+
+                
+                table.add_records(table_records, true);
+                //table.add_records_including_table_id_in_key(table_records, true);
                 callback(null, table);
             }
         });
@@ -84,8 +89,11 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
                     // add_records_including_table_id_in_key
 
                     var table = that.model.map_tables[table_name];
-                    table.add_records_including_table_id_in_key(table_records, true);
 
+
+                    //table.add_records_including_table_id_in_key(table_records, true);
+                    table.add_records(table_records, true);
+                    
                     // but does this set up the indexing correctly?
 
                     // a way to add the records while verifying the indexing?
