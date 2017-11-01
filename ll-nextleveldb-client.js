@@ -757,11 +757,6 @@ class LL_NextLevelDB_Client extends Evented_Class {
     // LL_GET_FIRST_LAST_KEYS_IN_RANGE
 
 
-
-
-    
-
-
     ll_count_keys_beginning(buf_beginning, callback) {
         var buf_0 = Buffer.alloc(1);
         buf_0.writeUInt8(0, 0);
