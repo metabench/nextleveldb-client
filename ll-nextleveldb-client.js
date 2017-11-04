@@ -11,9 +11,6 @@
 //  Connect to a Database with a Model, and then use that model to persist records.
 //   Could be a route into Active_Record technology.
 
-
-
-
 var http = require('http');
 var url = require('url');
 var WebSocketClient = require('websocket').client;
@@ -63,7 +60,6 @@ var protocol = 'http://';
 //  This would mean the queries could be made referring to string values on the client, and it automatically substitutes them for the integer values, and encodes the function
 //   call as binary.
 
-
 // Having the client able to 'tap into' the db modification system would help. The client could tell what version the db is at, and then put in place various modifications on
 //  a lower level.
 // Not so sure about huge amounts of changes, ie changing how an index works by removing all items and putting them back again.
@@ -73,18 +69,14 @@ var protocol = 'http://';
 // /kvs/  JSON encoded POST data, with no specific URL
 // Could make this an object that is controllable by something else.
 
-
 // Handling closed or interrupted connections...
 //  Would be nice if this buffered commands that are unable to be sent at present.
 //  Then when the connection is reestablished, it clears the buffer.
-
 
 // Non-streaming client, and streaming client.
 //  For the moment, will have streaming methods.
 //  If it's connected in streaming mode, it may transparently call the streaming methods.
 //   May rename current methods with an http prefix.
-
-
 
 // A collection of functions to call when reconnected?
 
@@ -94,8 +86,6 @@ var protocol = 'http://';
 //   Clustering will also speed up the retrieval considerable, should the bottleneck be the speed at which the DB gets read through.
 
 //   Also want to enable operations where the data is already considered loaded.
-//
-
 
 // TransferDB?
 //  Removes all records (everything) / deletes and recreates the database
@@ -119,9 +109,6 @@ var protocol = 'http://';
 //  It seems like .subscribe should be a feature.
 //   And then it could specify an event name to be raised when the data comes in.
 //   About integrating the near-real-time data updates with the familiar JavaScript methodology.
-
-
-
 
 // This will be simplified down to core functionality.
 //  Client won't use plugins for the moment, but will have versions that inherit from it.
@@ -163,9 +150,25 @@ const LL_WIPE = 20;
 const LL_WIPE_REPLACE = 21;
 
 
+const LL_SUBSCRIBE_ALL = 60;
+const LL_UNSUBSCRIBE_SUBSCRIPTION = 62;
+
+// LL_SUBSCRIBE_ALL will get callback with encoded data.
+//  Non-LL versions would decode that data.
+//  Then, alongside data loading, we should be able to populate indexed time value data structres.
+//   Then should be able to do pertinent calculations quickly.
+
+// Time offset indexes would help with this, making the data more compact.
+//  Or each record is the change from the previous one, then gets decoded.
+
+// 
+
+
+
+// Will have more data types with specific compressions.
+
 
 // -~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~- \\
-
 
 const XAS2 = 0;
 const DOUBLEBE = 1;
@@ -184,13 +187,24 @@ const ARRAY = 10;
 
 // -~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~- \\
 
-
+/**
+ * 
+ * 
+ * @class LL_NextLevelDB_Client
+ * @extends {Evented_Class}
+ */
 class LL_NextLevelDB_Client extends Evented_Class {
 	//'fields': [
 	//	['url', String],
 	//	['port', Number]
-	//],
-
+    //],
+    
+    /**
+     * 
+     * 
+     * @param {object} spec 
+     * @memberof LL_NextLevelDB_Client
+     */
     'constructor'(spec) {
         //console.log('LL_NextLevelDB_Client spec', spec);
 
@@ -205,16 +219,25 @@ class LL_NextLevelDB_Client extends Evented_Class {
 	// Want a way to stop / disconnect the client.
 	//  Would be useful to help the program end / release resources.
 
-	'stop'(callback) {
+    /**
+     * 
+    * 
+    * @param {any} callback 
+    * @memberof LL_NextLevelDB_Client
+    */
+    'stop'(callback) {
 		this.auto_reconnect = false;
 		this.websocket_connection.close();
 		if (callback) callback(null, true);
 	}
 
-
-
-
-	'start'(callback) {
+    /**
+     * 
+    * 
+    * @param {any} callback 
+    * @memberof LL_NextLevelDB_Client
+    */
+    'start'(callback) {
 		// Maybe connect here?
 		// Better to connect to the socket server
 
@@ -260,7 +283,6 @@ class LL_NextLevelDB_Client extends Evented_Class {
 		};
 
 		var first_connect = true;
-
 
 		//console.log('pre connect');
 		client.on('connect', function(connection) {
@@ -457,6 +479,12 @@ class LL_NextLevelDB_Client extends Evented_Class {
 		client.connect(ws_address, 'echo-protocol');
     }
     
+    /**
+     * 
+     * 
+     * @param {any} callback 
+     * @memberof LL_NextLevelDB_Client
+     */
     wipe(callback) {
         // send a wipe command to the server
 
@@ -484,6 +512,13 @@ class LL_NextLevelDB_Client extends Evented_Class {
 
     }
 
+    /**
+     * 
+     * 
+     * @param {buffer} buf_replacement 
+     * @param {any} callback 
+     * @memberof LL_NextLevelDB_Client
+     */
     wipe_replace(buf_replacement, callback) {
         //var buf_command = xas2(LL_WIPE_REPLACE).buffer;
         var buf_command = Buffer.concat([xas2(LL_WIPE_REPLACE).buffer, buf_replacement]);
@@ -515,6 +550,12 @@ class LL_NextLevelDB_Client extends Evented_Class {
 
 	// bid, ask, volume
 
+    /**
+     * 
+     * 
+     * @param {buffer} buf_message 
+     * @memberof LL_NextLevelDB_Client
+     */
     receive_binary_message(buf_message) {
         // decode the first byte...
 
@@ -534,6 +575,13 @@ class LL_NextLevelDB_Client extends Evented_Class {
 
     // with callback!
 
+    /**
+     * 
+     * 
+     * @param {buffer} message 
+     * @param {any} callback 
+     * @memberof LL_NextLevelDB_Client
+     */
     send_binary_message(message, callback) {
         // no callback on this
 
@@ -562,6 +610,71 @@ class LL_NextLevelDB_Client extends Evented_Class {
         this.websocket_connection.sendBytes(buf_2);
     }
 
+    // Multi callback messages / subscriptions
+    //  Keeps the response handler until its closed / unsubscribed.
+
+    send_binary_subscription_message(message, subscription_event_callback) {
+        var idx = this.id_ws_req++, ws_response_handlers = this.ws_response_handlers;
+        
+        var buf_2 = Buffer.concat([xas2(idx).buffer, message]);
+        var that = this;
+
+        ws_response_handlers[idx] = function (obj_message) {
+
+            console.log('obj_message', obj_message);
+            // May need to decode the message (somewhat) to read the initial subscription id.
+            //  will need to respond to the subscription connected event.
+
+
+
+
+            subscription_event_callback(obj_message);
+
+
+
+            // read the sub message id, then the subscription type.
+
+            //var pos = 0;
+            //xas2.read()
+
+            // Because its a subscription.
+            //ws_response_handlers[idx] = null;
+
+        };
+
+        // Should be able to unsubscribe
+
+        var unsubscribe = () => {
+            // Send unsubscribe with the idx to the server.
+
+            // LL_UNSUBSCRIBE_SUBSCRIPTION
+            var buf_query = Buffer.concat([xas2(LL_UNSUBSCRIBE_SUBSCRIPTION).buffer]);
+            // Only needs to give the subscription index. That is unique per client.
+
+            var buf_2 = Buffer.concat([xas2(idx).buffer, buf_query]);
+
+            that.websocket_connection.sendBytes(buf_2);
+
+            
+
+        }
+
+        console.log('pre send', buf_2);
+
+        this.websocket_connection.sendBytes(buf_2);
+
+        return unsubscribe;
+
+    }
+
+
+
+    /**
+     * 
+     * 
+     * @param {any} callback 
+     * @memberof LL_NextLevelDB_Client
+     */
     ll_get_core(callback) {
         // Gets within the key prefix of 0 to 11
         //  Up to and including the users table
@@ -577,6 +690,12 @@ class LL_NextLevelDB_Client extends Evented_Class {
         this.ll_get_records_in_range(buf_l, buf_u, callback);
     }
 
+    /**
+     * 
+     * 
+     * @param {any} callback 
+     * @memberof LL_NextLevelDB_Client
+     */
     ll_get_nonindex_core(callback) {
         this.ll_get_core((err, core) => {
             if (err) {
@@ -599,6 +718,13 @@ class LL_NextLevelDB_Client extends Evented_Class {
         
     //}
 
+    /**
+     * 
+     * 
+     * @param {int >= 0} key_prefix 
+     * @param {any} callback 
+     * @memberof LL_NextLevelDB_Client
+     */
     ll_get_records_by_key_prefix(key_prefix, callback) {
         var buf_kp = xas2(key_prefix).buffer;
         var buf_0 = Buffer.alloc(1);
@@ -613,6 +739,13 @@ class LL_NextLevelDB_Client extends Evented_Class {
         this.ll_get_records_in_range(buf_l, buf_u, callback);
     }
 
+    /**
+     * 
+     * 
+     * @param {buffer} buf_beginning 
+     * @param {any} callback 
+     * @memberof LL_NextLevelDB_Client
+     */
     ll_get_keys_beginning(buf_beginning, callback) {
         var buf_0 = Buffer.alloc(1);
         buf_0.writeUInt8(0, 0);
@@ -626,6 +759,13 @@ class LL_NextLevelDB_Client extends Evented_Class {
         this.ll_get_keys_in_range(buf_l, buf_u, callback);
     }
 
+    /**
+     * 
+     * 
+     * @param {int >= 0} key_prefix 
+     * @param {any} callback 
+     * @memberof LL_NextLevelDB_Client
+     */
     ll_get_keys_by_key_prefix(key_prefix, callback) {
         var buf_kp = xas2(key_prefix).buffer;
         var buf_0 = Buffer.alloc(1);
@@ -644,7 +784,14 @@ class LL_NextLevelDB_Client extends Evented_Class {
     //  higher level version would decode the results using Model_DB.deocde_keys
     //  higher level version could encode the key buffers itself, as well as take key prefix?
 
-
+    /**
+     * 
+     * 
+     * @param {buffer} buf_l 
+     * @param {buffer} buf_u 
+     * @param {any} callback 
+     * @memberof LL_NextLevelDB_Client
+     */
     ll_get_keys_in_range(buf_l, buf_u, callback) {
         // table prefix number, then the rest of the pk
         // need to know the table key prefixes.
@@ -691,6 +838,14 @@ class LL_NextLevelDB_Client extends Evented_Class {
     // Think we will need to get the paging right in order to retrieve the large numbers of trades.
     //  Incremental loading would be better to see in a browser too.
 
+    /**
+     * 
+     * 
+     * @param {buffer} buf_l 
+     * @param {buffer} buf_u 
+     * @param {any} callback 
+     * @memberof LL_NextLevelDB_Client
+     */
     ll_get_records_in_range(buf_l, buf_u, callback) {
         // table prefix number, then the rest of the pk
         // need to know the table key prefixes.
@@ -718,6 +873,14 @@ class LL_NextLevelDB_Client extends Evented_Class {
 
     }
 
+    /**
+     * 
+     * 
+     * @param {buffer} buf_l 
+     * @param {buffer} buf_u 
+     * @param {any} callback 
+     * @memberof LL_NextLevelDB_Client
+     */
     ll_get_first_last_keys_in_range(buf_l, buf_u, callback) {
         var paging = new Paging.None();
         var buf_command = xas2(LL_GET_FIRST_LAST_KEYS_IN_RANGE).buffer;
@@ -738,6 +901,13 @@ class LL_NextLevelDB_Client extends Evented_Class {
         });
     }
 
+    /**
+     * 
+     * 
+     * @param {buffer} buf_beginning 
+     * @param {any} callback 
+     * @memberof LL_NextLevelDB_Client
+     */
     ll_get_first_last_keys_beginning(buf_beginning, callback) {
         var buf_0 = Buffer.alloc(1);
         buf_0.writeUInt8(0, 0);
@@ -756,7 +926,13 @@ class LL_NextLevelDB_Client extends Evented_Class {
 
     // LL_GET_FIRST_LAST_KEYS_IN_RANGE
 
-
+    /**
+     * 
+     * 
+     * @param {buffer} buf_beginning 
+     * @param {any} callback 
+     * @memberof LL_NextLevelDB_Client
+     */
     ll_count_keys_beginning(buf_beginning, callback) {
         var buf_0 = Buffer.alloc(1);
         buf_0.writeUInt8(0, 0);
@@ -773,6 +949,14 @@ class LL_NextLevelDB_Client extends Evented_Class {
     // Need to count the keys for a range of table keys
     //  Need to adapt this to deal with table prefixes.
 
+    /**
+     * 
+     * 
+     * @param {buffer} buf_l 
+     * @param {buffer} buf_u 
+     * @param {any} callback 
+     * @memberof LL_NextLevelDB_Client
+     */
     ll_count_keys_in_range(buf_l, buf_u, callback) {
         var paging = new Paging.None();
         var buf_command = xas2(LL_COUNT_KEYS_IN_RANGE).buffer;
@@ -798,6 +982,13 @@ class LL_NextLevelDB_Client extends Evented_Class {
         });
     }
 
+    // subscribe all
+    //  would have multiple callbacks.
+    //  function to end the subscription returned.
+
+    
+
+
 	// In nextlevel, the string keys correspond to 64 bit values, stored as integers, represented in hex
 
 
@@ -814,7 +1005,13 @@ class LL_NextLevelDB_Client extends Evented_Class {
     //  Lower level meaning it more directly interacts with the LevelDB, including index rows an other non-record values.
     
 
-    // monomorphic? poly?
+    /**
+     * 
+     * 
+     * @param {any} paging 
+     * @param {any} callback 
+     * @memberof LL_NextLevelDB_Client
+     */
     'll_get_all_keys'(paging, callback) {
         var buf_query, pos = 0;
         if (!callback) {
@@ -873,6 +1070,12 @@ class LL_NextLevelDB_Client extends Evented_Class {
 		//this._json_get_request('query/all_keys', callback);
     }
 
+    /**
+     * 
+     * 
+     * @param {any} callback 
+     * @memberof LL_NextLevelDB_Client
+     */
     'll_count_records'(callback) {
         // Probably best to encode a binary query.
 
@@ -900,6 +1103,13 @@ class LL_NextLevelDB_Client extends Evented_Class {
 
     }
 
+    /**
+     * 
+     * 
+     * @param {buffer} buf_records 
+     * @param {any} callback 
+     * @memberof LL_NextLevelDB_Client
+     */
     'll_put_records_buffer'(buf_records, callback) {
         // PUT_RECORDS
         var buf_query = Buffer.concat([xas2(LL_PUT_RECORDS).buffer, buf_records]);
@@ -913,6 +1123,40 @@ class LL_NextLevelDB_Client extends Evented_Class {
                 // Don't know if it would be useful to get back the ids.
             }
         });
+    }
+
+    'll_subscribe_all'(subscription_event_callback) {
+
+        // Or two callbacks - for subscription set up, and subscription event.
+
+
+
+        // Should maybe be able to produce error callbacks, rather than event callbacks?
+
+
+
+        var buf_query = Buffer.concat([xas2(LL_SUBSCRIBE_ALL).buffer]);
+
+        var unsubscribe = this.send_binary_subscription_message(buf_query, (sub_event) => {
+            console.log('sub_event', sub_event);
+
+            // still a low level function.
+            //  just deals with the binary data.
+
+            // And a higher level wrapper would process / decode these subscription events.
+            subscription_event_callback(sub_event);
+
+
+
+        });
+        // Not just a normal binary message.
+        //  A binary message with multiple callbacks.
+
+        // and return unsubscribe?
+        return unsubscribe;
+
+
+
     }
 
     // A paging definition object may help.

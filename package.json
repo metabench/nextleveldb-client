@@ -3,7 +3,7 @@
   "main": "nextleveldb-client.js",
   "license": "MIT",
   "dependencies": {
-    "jsgui3": "^0.0.8",
+    "jsgui3": "^0.0.9",
     "moment": "^2.18.1",
     "recursive-readdir": "^2.2.1",
     "request": "^2.81.0",
@@ -22,5 +22,5 @@
     "type": "git",
     "url": "https://github.com/metabench/nextleveldb-client.git"
   },
-  "version": "0.0.5"
+  "version": "0.0.6"
 }
