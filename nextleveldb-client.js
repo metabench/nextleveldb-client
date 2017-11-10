@@ -947,6 +947,10 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
 
     }
 
+    'get_table_kp_by_name'(table_name, callback) { 
+        this.get_table_id_by_name(table_name, (err, id) => { if (err) { callback(err); } else { callback(null, id * 2 + 2)}})
+    }
+
     // get_table_kv_field_names
 
     'get_table_kv_field_names'(table_name, callback) {
@@ -1406,6 +1410,98 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
         })
 
         return unsubscribe;
+    }
+
+    subscribe_key_prefix_puts(buf_kp, subscription_event_handler) {
+        var unsubscribe = this.ll_subscribe_key_prefix_puts(buf_kp, (ll_subscription_event) => {
+            var pos = 0, i_num, i_sub_evt_type;
+            //console.log('xas2.read', xas2.read);
+            //console.log('xas2', xas2);
+
+            //console.log('xas2.read', typeof xas2.read);
+
+            console.log('ll_subscription_event', ll_subscription_event);
+
+            // both batch put and individual puts?
+
+            //  for the moment, don't buffer the puts that go to the client.
+            //   do them all immediately.
+            //   could debounce them up to a limit.
+            //    have a 100ms window where it can receive events for processing in that batch.
+
+
+
+
+
+
+            /*
+
+            [i_num, pos] = xas2.read(ll_subscription_event, pos);
+            [i_sub_evt_type, pos] = xas2.read(ll_subscription_event, pos);
+
+
+            var buf_the_rest = Buffer.alloc(ll_subscription_event.length - pos);
+            ll_subscription_event.copy(buf_the_rest, 0, pos);
+
+            var res = {};
+
+
+            if (i_sub_evt_type === SUB_CONNECTED) {
+                console.log('Connected!');
+
+                // When it is connected, we return the subscription id.
+                //console.log('i_num', i_num);
+                // May need the subscription number to unsubscribe.
+
+                res.type = 'connected';
+                res.client_subscription_id = i_num;
+                res.id = i_num;
+                subscription_event_handler(res);
+
+
+
+            } 
+
+            if (i_sub_evt_type === SUB_RES_TYPE_BATCH_PUT) {
+                //console.log('SUB_RES_TYPE_BATCH_PUT', SUB_RES_TYPE_BATCH_PUT);
+
+                //console.log('buf_the_rest', buf_the_rest);
+
+                res.type = 'batch_put';
+
+                // need to decode the buffer.
+                var row_buffers = Binary_Encoding.get_row_buffers(buf_the_rest);
+                //console.log('row_buffers', row_buffers);
+
+                var decoded_row_buffers = Model_Database.decode_model_rows(row_buffers);
+
+                //console.log('decoded_row_buffers', decoded_row_buffers);
+
+                res.records = decoded_row_buffers;
+
+                subscription_event_handler(res);
+            }
+
+            */
+
+
+        })
+
+        return unsubscribe;
+    }
+
+    subscribe_table_puts(table_name, subscription_event_handler) {
+        var that = this;
+        that.get_table_kp_by_name(table_name, (err, kp) => {
+            if (err) {
+                subscription_event_handler({
+                    'error': err
+                });
+            } else {
+                var buf_kp = xas2(kp).buffer;
+                that.subscribe_key_prefix_puts(buf_kp, subscription_event_handler);
+            }
+        })
     }
 
 

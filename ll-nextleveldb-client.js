@@ -151,6 +151,7 @@ const LL_WIPE_REPLACE = 21;
 
 
 const LL_SUBSCRIBE_ALL = 60;
+const LL_SUBSCRIBE_KEY_PREFIX_PUTS = 61;
 const LL_UNSUBSCRIBE_SUBSCRIPTION = 62;
 
 // LL_SUBSCRIBE_ALL will get callback with encoded data.
@@ -624,9 +625,6 @@ class LL_NextLevelDB_Client extends Evented_Class {
             console.log('obj_message', obj_message);
             // May need to decode the message (somewhat) to read the initial subscription id.
             //  will need to respond to the subscription connected event.
-
-
-
 
             subscription_event_callback(obj_message);
 
@@ -1136,6 +1134,42 @@ class LL_NextLevelDB_Client extends Evented_Class {
 
 
         var buf_query = Buffer.concat([xas2(LL_SUBSCRIBE_ALL).buffer]);
+
+        var unsubscribe = this.send_binary_subscription_message(buf_query, (sub_event) => {
+            console.log('sub_event', sub_event);
+
+            // still a low level function.
+            //  just deals with the binary data.
+
+            // And a higher level wrapper would process / decode these subscription events.
+            subscription_event_callback(sub_event);
+
+
+
+        });
+        // Not just a normal binary message.
+        //  A binary message with multiple callbacks.
+
+        // and return unsubscribe?
+        return unsubscribe;
+
+
+
+    }
+
+    'll_subscribe_key_prefix_puts'(buf_kp, subscription_event_callback) {
+        
+        // Or two callbacks - for subscription set up, and subscription event.
+
+
+
+        // Should maybe be able to produce error callbacks, rather than event callbacks?
+
+
+        console.log('buf_kp', buf_kp);
+        console.log('1) buf_kp hex', buf_kp.toString('hex'));
+        var buf_query = Buffer.concat([xas2(LL_SUBSCRIBE_KEY_PREFIX_PUTS).buffer, buf_kp]);
+
 
         var unsubscribe = this.send_binary_subscription_message(buf_query, (sub_event) => {
             console.log('sub_event', sub_event);
