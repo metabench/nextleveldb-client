@@ -3,15 +3,15 @@
   "main": "nextleveldb-client.js",
   "license": "MIT",
   "dependencies": {
-    "jsgui3": "^0.0.9",
+    "lang-mini": "^0.0.1",
     "moment": "^2.18.1",
     "recursive-readdir": "^2.2.1",
     "request": "^2.81.0",
     "single-line-log": "^1.1.2",
-    "websocket": "^1.0.24",
+    "websocket": "^1.0.25",
     "xas2": "^0.0.10",
-    "binary-encoding": "^0.0.30",
-    "nextleveldb-model": "^0.0.6"
+    "binary-encoding": "^0.0.31",
+    "nextleveldb-model": "^0.0.9"
   },
   "engines": {
     "node": ">=8.5.0"
@@ -22,5 +22,5 @@
     "type": "git",
     "url": "https://github.com/metabench/nextleveldb-client.git"
   },
-  "version": "0.0.6"
+  "version": "0.0.7"
 }

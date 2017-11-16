@@ -1,4 +1,11 @@
-var jsgui = require('jsgui3');
+
+// Possibly makes it unusable in the browser.
+//  Could possibly have node-nextleveldb-client
+
+var fs = require('fs');
+var os = require('os');
+
+var jsgui = require('lang-mini');
 var each = jsgui.each, tof = jsgui.tof, Fns = jsgui.Fns;
 
 var LL_NextlevelDB_Client = require('./ll-nextleveldb-client');
@@ -19,6 +26,48 @@ var Array_Table = require('arr-table');
 const SUB_CONNECTED = 0;
 const SUB_RES_TYPE_BATCH_PUT = 1;
 
+function ensure_exists(path, mask, cb) {
+    if (typeof mask == 'function') { // allow the `mask` parameter to be optional
+        cb = mask;
+        mask = 0777;
+    }
+    fs.mkdir(path, mask, function(err) {
+        if (err) {
+            if (err.code == 'EEXIST') cb(null); // ignore the error if the folder already exists
+            else cb(err); // something else went wrong
+        } else cb(null); // successfully created folder
+    });
+}
+
+var get_directories = function(dir, cb) { 
+    console.log('get_directories', dir);
+    fs.readdir(dir, function(err, files) {
+        var dirs = [],
+        filePath,
+        
+        checkDirectory = function(err, stat) {
+            if(stat.isDirectory()) {
+                dirs.push(files[i]);
+            }
+            if(i + 1 === l) { // last record
+                cb(null, dirs);
+            }
+        };
+        //console.log('files', files);
+
+        for(var i=0, l=files.length; i<l; i++) {
+            if(files[i][0] !== '.') { // ignore hidden
+                filePath = dir+'/'+files[i];
+                fs.stat(filePath, checkDirectory);
+            }
+        }
+        if (files.length === 0) {
+            cb(null, []);
+        }
+    });
+}
+
+
 
 /**
  * 
@@ -30,12 +79,59 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
 
     // Functionality to persist entire models, or system tables.
     //  Will interact with a Model.
-
     // Could have a local Model?
-
     // Initial setup of crypto database.
-
     // load model, including specific tables
+    /**
+     * 
+     * 
+     * @param {any} callback 
+     * @memberof LL_NextLevelDB_Client
+     */
+    get_core(callback) {
+        // Gets within the key prefix of 0 to 11
+        //  Up to and including the users table
+
+        // Not everything has been persisted yet. Don't think the indexes have been persisted.
+        //  Knowing about the indexes seems important for putting together queries.
+        // Need to get keys with the prefix of [0] to [9]
+        //  May be worth storing this number, could call it the core size.
+
+        // just through the beginning of the key prefixes.
+        var buf_l = xas2(0).buffer;
+        var buf_u = xas2(9).buffer;
+        this.ll_get_records_in_range(buf_l, buf_u, callback);
+    }
+
+    count_core(callback) {
+        var buf_l = xas2(0).buffer;
+        var buf_u = xas2(9).buffer;
+        this.ll_count_keys_in_range(buf_l, buf_u, callback);
+    }
+    
+    /**
+     * 
+     * 
+     * @param {any} callback 
+     * @memberof LL_NextLevelDB_Client
+     */
+    get_nonindex_core(callback) {
+        this.get_core((err, core) => {
+            if (err) {
+                callback(err);
+            } else {
+                var filtered_core = [];
+                each(core, (item) => {
+                    var buf_key = item[0];
+                    var n = Binary_Encoding.decode_first_value_xas2_from_buffer(buf_key);
+                    if (n === 0 || n === 1 || n % 2 === 0) {
+                        filtered_core.push(item);
+                    }
+                })
+                callback(null, filtered_core);
+            }
+        });
+    }
 
     /**
      * 
@@ -45,7 +141,7 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
      */
     'load_core'(callback) {
         var that = this;
-        this.ll_get_core((err, buf_core) => {
+        this.get_core((err, buf_core) => {
             if (err) { callback(err); } else {
                 //console.log('buf_core', buf_core);
                 that.model = Model_Database.load(buf_core);
@@ -68,7 +164,6 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
         that.get_table_records(table_name, (err, table_records) => {
             if (err) { callback(err); } else {
                 //throw 'stop';
-
                 /*
                 table.add_records_including_table_id_in_key(table_records, true, (err, res) => {
                     if (err) { callback(err); } else {
@@ -79,8 +174,6 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
                 */
 
                 // The get_table_records function won't have the id within the key.
-
-                
                 table.add_records(table_records, true);
                 //table.add_records_including_table_id_in_key(table_records, true);
                 callback(null, table);
@@ -98,7 +191,6 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
     'load_tables'(arr_table_names, callback) {
         var fns = Fns();
         //fns.push([fn, arr_params]);
-
         // get table records should decode the records
         var that = this;
 
@@ -108,8 +200,6 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
                 //console.log('res_all', res_all);
                 //console.log('res_all', JSON.stringify(res_all));
                 //console.log('res_all.length', res_all.length);
-
-                
 
                 each(res_all, (table_records, table_index) => {
                     var table_name = arr_table_names[table_index];
@@ -169,16 +259,11 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
         var that = this;
         this.load_core((err, model) => {
             if (err) { callback(err); } else {
-
                 that.load_tables(arr_table_names, callback);
-
                 // Test that the core has loaded successfully?
-
                 //throw 'stop';
                 // try loading a single table from the model.
-
                 // Could be loading these tables that creates the problem, earlier incrementor and loading issues seem to have been solved.
-
             }
         });
     }
@@ -212,8 +297,6 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
             if (err) { callback(err); } else {
 
                 // get_table_index_records should decode the records
-
-                
 
                 if (index_records.length === 0) {
                     callback(null, '0 index rows');
@@ -265,7 +348,6 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
     'maintain_table_index'(table_name, callback) {
 
         // Would be nice to get the table index info from the db.
-
 
         this.validate_table_index(table_name, (err, validation) => {
             if (err) { callback(err); } else {
@@ -718,6 +800,13 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
 
         var t_value = tof(value);
 
+        if (!this.model) {
+            console.trace();
+            throw 'expected: this.model';
+        }
+
+
+
         var table_kp = this.model.map_tables[table_name].key_prefix;
 
         if (t_value === 'array') {
@@ -796,9 +885,11 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
                 //  ll_get_first_last_keys_in_range
 
                 //this.ll_count_keys_beginning(buf_key, callback);
+                //console.log('buf_key', buf_key);
 
                 this.ll_get_first_last_keys_beginning(buf_key, (err, ll_res) => {
                     if (err) { callback(err); } else {
+                        //console.log('ll_res', ll_res);
                         var res = Model_Database.decode_keys(ll_res);
                         callback(null, res);
                     }
@@ -1132,7 +1223,55 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
     //  See about putting everything in apart from authentication to start with.
     //  An authentication / access middleware module would work well.
 
+    // backup name
 
+    new_backup_path(name, callback) {
+
+
+
+        console.log('new_backup_path');
+        var user_dir = os.homedir();
+        //console.log('user_dir', user_dir);
+        //var docs_dir =
+    
+        var path_backups = user_dir + '/NextLevelDB/backups';
+        path_backups = path_backups.split('\\').join('/');
+        console.log('path_backups', path_backups);
+
+        // ensure that directory exists.
+
+        ensure_exists(path_backups, (err, res) => {
+            console.log('res', res);
+
+
+            if (err) { callback(err); } else {
+                get_directories(path_backups, (err, dirs) => {
+                    if (err) { callback(err); } else {
+                        console.log('dirs', dirs);
+
+                        // 
+
+                        console.log('2* path_backups', path_backups);
+
+
+
+                        if (dirs.length === 0) {
+                            //console.log()
+                            callback(null, path_backups + '/0000 ' + name);
+                        } else {
+
+                        }
+                    }
+                })
+            }
+        })
+
+
+
+
+
+
+    }
 
 
 
@@ -1356,7 +1495,7 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
 
             //console.log('xas2.read', typeof xas2.read);
 
-            console.log('ll_subscription_event', ll_subscription_event);
+            //console.log('ll_subscription_event', ll_subscription_event);
 
 
 
@@ -1415,37 +1554,27 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
     subscribe_key_prefix_puts(buf_kp, subscription_event_handler) {
         var unsubscribe = this.ll_subscribe_key_prefix_puts(buf_kp, (ll_subscription_event) => {
             var pos = 0, i_num, i_sub_evt_type;
-            //console.log('xas2.read', xas2.read);
-            //console.log('xas2', xas2);
-
-            //console.log('xas2.read', typeof xas2.read);
-
-            console.log('ll_subscription_event', ll_subscription_event);
-
-            // both batch put and individual puts?
-
-            //  for the moment, don't buffer the puts that go to the client.
-            //   do them all immediately.
-            //   could debounce them up to a limit.
-            //    have a 100ms window where it can receive events for processing in that batch.
-
-
-
-
-
-
-            /*
-
             [i_num, pos] = xas2.read(ll_subscription_event, pos);
             [i_sub_evt_type, pos] = xas2.read(ll_subscription_event, pos);
+            console.log('[i_num, i_sub_evt_type]', [i_num, i_sub_evt_type]);
 
 
             var buf_the_rest = Buffer.alloc(ll_subscription_event.length - pos);
             ll_subscription_event.copy(buf_the_rest, 0, pos);
 
+            
+
+            
+            //console.log('xas2.read', xas2.read);
+            //console.log('xas2', xas2);
+
+            //console.log('xas2.read', typeof xas2.read);
+
+            console.log('ll_subscription_event.length', ll_subscription_event.length);
+
+            
+
             var res = {};
-
-
             if (i_sub_evt_type === SUB_CONNECTED) {
                 console.log('Connected!');
 
@@ -1463,15 +1592,22 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
             } 
 
             if (i_sub_evt_type === SUB_RES_TYPE_BATCH_PUT) {
-                //console.log('SUB_RES_TYPE_BATCH_PUT', SUB_RES_TYPE_BATCH_PUT);
+                console.log('SUB_RES_TYPE_BATCH_PUT', SUB_RES_TYPE_BATCH_PUT);
 
-                //console.log('buf_the_rest', buf_the_rest);
+                console.log('buf_the_rest', buf_the_rest);
 
                 res.type = 'batch_put';
 
                 // need to decode the buffer.
                 var row_buffers = Binary_Encoding.get_row_buffers(buf_the_rest);
-                //console.log('row_buffers', row_buffers);
+                console.log('row_buffers', row_buffers);
+
+                each(row_buffers, (rb, i) => {
+                    console.log('row_buffers.length', row_buffers.length);
+                    console.log('rb, i', rb, i);
+                    var d = Model_Database.decode_model_row(rb);
+                    console.log('d', d);
+                })
 
                 var decoded_row_buffers = Model_Database.decode_model_rows(row_buffers);
 
@@ -1482,9 +1618,28 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
                 subscription_event_handler(res);
             }
 
+
+            // read a value or two from the subscription first
+
+            //var put_rows_buffers = Binary_Encoding.get_row_buffers(buf_the_rest);
+            //console.log('put_rows_buffers.length', put_rows_buffers.length);
+
+            //var decoded_rows = Model_Database.decode_model_rows(buf_the_rest);
+            /*
+            var row_buffers = Binary_Encoding.get_row_buffers(buf_the_rest);
+            console.log('row_buffers', row_buffers);
+
+            var decoded_rows = Model_Database.decode_model_rows(row_buffers);
+            console.log('decoded_rows', decoded_rows);
             */
 
 
+            // both batch put and individual puts?
+
+            //  for the moment, don't buffer the puts that go to the client.
+            //   do them all immediately.
+            //   could debounce them up to a limit.
+            //    have a 100ms window where it can receive events for processing in that batch.
         })
 
         return unsubscribe;
@@ -1500,6 +1655,49 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
             } else {
                 var buf_kp = xas2(kp).buffer;
                 that.subscribe_key_prefix_puts(buf_kp, subscription_event_handler);
+            }
+        })
+    }
+
+    get_table_record_field_by_index_lookup(table_name, field_name, index_field_name, index_field_value, callback) {
+        var that = this;
+
+        // Possibly there should be further functionality for this on the server.
+        //  A server maintaining its own core model would be useful.
+        //   That means the model would not hold non-core records.
+        //    It would know how to do the indexing.
+
+        // A local copy of the Model would help scan the indexes to see which fields are there.
+        //  Maintaining the local copy of the Model seems very useful for a lot of functionality.
+        //   Nevertheless, it will be useful to be able to operate without a local copy of the model.
+
+        
+        // Having a copy of the Model on both the client and the server seems very useful.
+        //  The server could load its model automatically on load.
+        //  There could be ws functions made available to the client to read from the server-side model.
+
+        // There could also be server-side index verification and fixing.
+        //  Getting the Model running on the server means the server could properly index rows.
+
+        
+
+
+        
+
+
+
+
+        that.get_table_kp_by_name(table_name, (err, kp) => {
+            if (err) {
+                callback(err);
+            } else {
+                //var buf_kp = xas2(kp).buffer;
+                //that.subscribe_key_prefix_puts(buf_kp, subscription_event_handler);
+
+                var idx_kp = kp + 1;
+                //  then 
+
+
             }
         })
     }

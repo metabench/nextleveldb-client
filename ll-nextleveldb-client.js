@@ -14,7 +14,7 @@
 var http = require('http');
 var url = require('url');
 var WebSocketClient = require('websocket').client;
-var jsgui = require('jsgui3');
+var jsgui = require('lang-mini');
 var Evented_Class = jsgui.Evented_Class;
 var Fns = jsgui.Fns;
 var is_array = jsgui.is_array;
@@ -144,7 +144,8 @@ const LL_GET_RECORDS_IN_RANGE = 4;
 
 const LL_COUNT_KEYS_IN_RANGE = 5;
 const LL_GET_FIRST_LAST_KEYS_IN_RANGE = 6;
-const LL_COUNT_GET_FIRST_LAST_KEYS_IN_RANGE = 7;
+
+//const LL_COUNT_GET_FIRST_LAST_KEYS_IN_RANGE = 7;
 
 const LL_WIPE = 20;
 const LL_WIPE_REPLACE = 21;
@@ -247,7 +248,12 @@ class LL_NextLevelDB_Client extends Evented_Class {
 
 		this.id_ws_req = 0;
 		var ws_response_handlers = this.ws_response_handlers = {};
-		var client = this.websocket_client = new WebSocketClient();
+		var client = this.websocket_client = new WebSocketClient({
+            maxReceivedFrameSize: 512000000,
+            maxReceivedMessageSize: 512000000,
+            fragmentOutgoingMessages: false,
+            closeTimeout: 10000
+        });
 
 		client.on('connectFailed', function(error) {
 			// socket could be closed.
@@ -657,7 +663,7 @@ class LL_NextLevelDB_Client extends Evented_Class {
 
         }
 
-        console.log('pre send', buf_2);
+        //console.log('pre send', buf_2);
 
         this.websocket_connection.sendBytes(buf_2);
 
@@ -667,50 +673,8 @@ class LL_NextLevelDB_Client extends Evented_Class {
 
 
 
-    /**
-     * 
-     * 
-     * @param {any} callback 
-     * @memberof LL_NextLevelDB_Client
-     */
-    ll_get_core(callback) {
-        // Gets within the key prefix of 0 to 11
-        //  Up to and including the users table
+    
 
-        // Not everything has been persisted yet. Don't think the indexes have been persisted.
-        //  Knowing about the indexes seems important for putting together queries.
-        // Need to get keys with the prefix of [0] to [9]
-        //  May be worth storing this number, could call it the core size.
-
-        // just through the beginning of the key prefixes.
-        var buf_l = xas2(0).buffer;
-        var buf_u = xas2(9).buffer;
-        this.ll_get_records_in_range(buf_l, buf_u, callback);
-    }
-
-    /**
-     * 
-     * 
-     * @param {any} callback 
-     * @memberof LL_NextLevelDB_Client
-     */
-    ll_get_nonindex_core(callback) {
-        this.ll_get_core((err, core) => {
-            if (err) {
-                callback(err);
-            } else {
-                var filtered_core = [];
-                each(core, (item) => {
-                    var buf_key = item[0];
-                    var n = Binary_Encoding.decode_first_value_xas2_from_buffer(buf_key);
-                    if (n === 0 || n === 1 || n % 2 === 0) {
-                        filtered_core.push(item);
-                    }
-                })
-                callback(null, filtered_core);
-            }
-        });
-    }
 
     //ll_get_table_records_by_kp(table_key_prefix, callback) {
         
@@ -833,6 +797,34 @@ class LL_NextLevelDB_Client extends Evented_Class {
 
     }
 
+
+    ll_get_buf_records_in_range(buf_l, buf_u, callback) {
+        // table prefix number, then the rest of the pk
+        // need to know the table key prefixes.
+        // LL_GET_RECORDS_IN_RANGE
+
+        // no paging right now.
+
+        var paging = new Paging.None();
+        var buf_command = xas2(LL_GET_RECORDS_IN_RANGE).buffer;
+        // the lengths of the buffers too...
+        var buf_query = Buffer.concat([buf_command, paging.buffer, xas2(buf_l.length).buffer, buf_l, xas2(buf_u.length).buffer, buf_u]);
+        //var buf_l = 
+        // Include a paging buffer too...?
+        this.send_binary_message(buf_query, (err, res_binary_message) => {
+            if (err) {
+                callback(err);
+            } else {
+                //console.log('res_binary_message', res_binary_message);
+                //console.log('res_binary_message.length', res_binary_message.length);
+                //var arr_kv_buffers = Binary_Encoding.split_length_item_encoded_buffer_to_kv(res_binary_message);
+                //console.log('arr_kv_buffers', arr_kv_buffers);
+                callback(null, res_binary_message);
+            }
+        });
+
+    }
+
     // Think we will need to get the paging right in order to retrieve the large numbers of trades.
     //  Incremental loading would be better to see in a browser too.
 
@@ -844,6 +836,11 @@ class LL_NextLevelDB_Client extends Evented_Class {
      * @param {any} callback 
      * @memberof LL_NextLevelDB_Client
      */
+
+    // ll ll_get_records_in_range no split
+
+    
+    
     ll_get_records_in_range(buf_l, buf_u, callback) {
         // table prefix number, then the rest of the pk
         // need to know the table key prefixes.
@@ -1252,9 +1249,12 @@ if (require.main === module) {
             };
             //test_get_all_keys();
 
+            /*
             var test_get_system_records = function () {
                 // And different tests for using paging.
                 // ll_get_nonindex_core   ll_get_core
+
+                // Not a ll function.
 
                 lc.ll_get_nonindex_core((err, core) => {
                     // Should get them as an array.
@@ -1279,6 +1279,7 @@ if (require.main === module) {
 
             };
             test_get_system_records();
+            */
 
             // Getting keys within a range, and paged keys within a range, is one of the important things.
 
