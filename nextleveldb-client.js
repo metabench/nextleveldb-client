@@ -16,6 +16,8 @@ var Model_Database = Model.Database;
 
 var Array_Table = require('arr-table');
 
+var path = require('path');
+var resolve = path.resolve;
 // A more advanced client would definitely help.
 //  Client will be used for db replication and distribution as well.
 //  The server will have a client of its own to connect to other servers.
@@ -23,8 +25,41 @@ var Array_Table = require('arr-table');
 // Want an easy way to replicate all records from one table over to the same table in a different db.
 //  A GUI may prove useful for this.
 
+// Backups and authentication seem like the best approach to keep this up online.
+// Take backups from existing DBs, allow them tto be put into other dbs
+// 
+
+// Could separate into browser-client and node-client.
+
+// or node_features(client), web_features(client)
+
+
+// Could have a client have a database get / initialise with a full copy of another database.
+//  Streaming of rows does seem important for this.
+
+// Streaming funtionality definitely seems more important for getting data from the db.
+
+// Carry out replication where it streams from existing server.
+//  Would likely need a little downtime to do the npm update / install.
+
+
+
+
+
+
+
+
 const SUB_CONNECTED = 0;
 const SUB_RES_TYPE_BATCH_PUT = 1;
+
+var directory_exists = function(path, callback) {
+    fs.stat(resolve(path), function(err, stat) {
+      if (err) {
+        return callback(false);
+      }
+      callback(null, stat.isDirectory());
+    });
+  };
 
 function ensure_exists(path, mask, cb) {
     if (typeof mask == 'function') { // allow the `mask` parameter to be optional
@@ -39,8 +74,11 @@ function ensure_exists(path, mask, cb) {
     });
 }
 
+/*
 var get_directories = function(dir, cb) { 
     console.log('get_directories', dir);
+
+
     fs.readdir(dir, function(err, files) {
         var dirs = [],
         filePath,
@@ -66,7 +104,58 @@ var get_directories = function(dir, cb) {
         }
     });
 }
+*/
 
+
+var get_directories = function(dir, cb) { 
+    //dir = dir.split('/').join('\\');
+
+    //console.log('* get_directories', dir);
+    fs.readdir(dir, function(err, files) {
+        if (err) {
+            //console.log('err', err);
+            //throw err;
+            cb(err);
+        } else {
+            //console.log('files.length', files.length);
+            var dirs = [],
+            filePath, c = files.length, i = 0, d = 0
+            
+            checkDirectory = function(err, stat) {
+                //console.log('checkDirectory');
+                if(stat.isDirectory()) {
+                    dirs.push(files[d]);
+                }
+                d++;
+                //console.log('i', i);
+                c--;
+                //console.log('c', c);
+                if(c === 0) { // last record
+                    cb(null, dirs);
+                }
+            };
+            
+    
+            for(i=0, l=files.length; i<l; i++) {
+                if(files[i][0] !== '.') { // ignore hidden
+                    filePath = dir + '/' + files[i];
+                    fs.stat(filePath, checkDirectory);
+                }
+            }
+            if (files.length === 0) {
+                cb(null, []);
+            }
+        }
+
+        
+    });
+}
+
+var pad = (num, size) => {
+    var s = num+"";
+    while (s.length < size) s = "0" + s;
+    return s;
+}
 
 
 /**
@@ -151,6 +240,14 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
         });
     }
 
+    'ensure_model'(callback) {
+        if (this.model) {
+            callback(null, model);
+        } else {
+            this.load_core(callback);
+        }
+    }
+
     /**
      * 
      * 
@@ -163,15 +260,12 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
         var table = that.model.map_tables[table_name];
         that.get_table_records(table_name, (err, table_records) => {
             if (err) { callback(err); } else {
-                //throw 'stop';
-                /*
-                table.add_records_including_table_id_in_key(table_records, true, (err, res) => {
-                    if (err) { callback(err); } else {
-                        throw 'stop';
-                        callback(null, table);
-                    }
-                });
-                */
+
+                //table.clear();
+                // Seems like clearing the table first makes sense as it has the same result.
+
+                // 
+                
 
                 // The get_table_records function won't have the id within the key.
                 table.add_records(table_records, true);
@@ -830,13 +924,13 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
 
             this.ll_get_keys_beginning(buf_idx_key, (err, ll_res) => {
                 if (err) { callback(err); } else {
-                    console.log('ll_res', ll_res);
+                    //console.log('ll_res', ll_res);
 
                     var decoded_index_key = Model_Database.decode_key(ll_res[0]);
-                    console.log('decoded_index_key', decoded_index_key);
+                    //console.log('decoded_index_key', decoded_index_key);
 
                     var arr_pk_ref = decoded_index_key.slice(3);
-                    console.log('arr_pk_ref', arr_pk_ref);
+                    //console.log('arr_pk_ref', arr_pk_ref);
 
                     if (arr_pk_ref.length === 1) {
                         callback(null, arr_pk_ref[0]);
@@ -988,7 +1082,7 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
         this.ll_get_table_index_records(table_name, (err, index_records) => {
             if (err) { callback(err); } else {
                 var decoded_index_records = Model_Database.decode_model_rows(index_records);
-                console.log('decoded_index_records', decoded_index_records);
+                //console.log('decoded_index_records', decoded_index_records);
                 callback(null, decoded_index_records);
             }
         })
@@ -1053,7 +1147,7 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
 
         that.get_table_id_by_name('table fields', (err, table_fields_id) => {
             if (err) { callback(err); } else {
-                console.log('table_fields_id', table_fields_id);
+                //console.log('table_fields_id', table_fields_id);
                 var table_fields_kp = table_fields_id * 2 + 2;
 
                 // then we lookup the fields for that table by id.
@@ -1076,11 +1170,11 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
 
                         //var akp = [table_fields_id, table_id];
                         var buf = Model_Database.encode_key(table_fields_kp, [table_id]);
-                        console.log('buf', buf);
+                        //console.log('buf', buf);
 
                         that.get_records_by_key_prefix(buf, (err, fields_records) => {
                             if (err) { callback(err); } else {
-                                console.log('fields_records', fields_records);
+                                //console.log('fields_records', fields_records);
 
                                 var res_keys = [];
                                 var res_values = [];
@@ -1100,24 +1194,11 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
                                 callback(null, res);
                             }
                         });
-        
-        
-                        
-        
                     }
                 })
-
-                
-                
-
             }
         })
-
-        
-
-
         //that.ll_get_t
-
     }
 
     // Could further expand table field types.
@@ -1226,51 +1307,8 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
     // backup name
 
     new_backup_path(name, callback) {
-
-
-
-        console.log('new_backup_path');
-        var user_dir = os.homedir();
-        //console.log('user_dir', user_dir);
-        //var docs_dir =
-    
-        var path_backups = user_dir + '/NextLevelDB/backups';
-        path_backups = path_backups.split('\\').join('/');
-        console.log('path_backups', path_backups);
-
-        // ensure that directory exists.
-
-        ensure_exists(path_backups, (err, res) => {
-            console.log('res', res);
-
-
-            if (err) { callback(err); } else {
-                get_directories(path_backups, (err, dirs) => {
-                    if (err) { callback(err); } else {
-                        console.log('dirs', dirs);
-
-                        // 
-
-                        console.log('2* path_backups', path_backups);
-
-
-
-                        if (dirs.length === 0) {
-                            //console.log()
-                            callback(null, path_backups + '/0000 ' + name);
-                        } else {
-
-                        }
-                    }
-                })
-            }
-        })
-
-
-
-
-
-
+        //console.log('new_backup_path');
+        new_backup_path(name, callback);
     }
 
 
@@ -1321,7 +1359,6 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
         }
     }
 
-
     // Call it key selection
     //  or index (key) selection?
 
@@ -1344,56 +1381,7 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
                 that.get_records_by_key_prefix(buf, callback);
             }
         });
-
-        /*
-
-
-        if (this.model) {
-            var table = this.model.map_tables[table_name];
-            if (table) {
-                var kp = table.key_prefix;
-                //this.ll_get_records_by_key_prefix(kp, callback);
-
-                // compose the selection key
-
-                //var selection_key = [kp];
-                //each(arr_index_selection, (v) => {
-                //    selection_key.push(v);
-                //});
-
-                console.log('kp', kp);
-
-                var encoded = Binary_Encoding.encode_to_buffer(arr_index_selection, kp);
-                console.log('encoded', encoded);
-                throw 'stop';
-
-
-
-                this.count_keys_beginning(encoded, callback);
-
-                // then get count with that key prefix
-                //  count keys starting
-
-
-                // encode the key
-
-                //var encoded = Binary_Encoding.encode_to_buffer(arr_index_selection, kp);
-                //console.log('encoded', encoded);
-
-                //this.ll_count_keys_in_range(buf_l, buf_u, callback);
-
-            } else {
-                callback('Table ' + table_name + ' not found');
-            }
-        } else {
-            //throw 'Expected this.model, otherwise can\'t find table by name'
-            callback('Expected this.model, otherwise can\'t find table by name');
-        }
-
-        */
     }
-
-
 
     // Selecting from the index...
     //  should use key prefix plus one
@@ -1411,30 +1399,21 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
             if (table) {
                 var kp = table.key_prefix;
                 //this.ll_get_records_by_key_prefix(kp, callback);
-
                 // compose the selection key
-
                 //var selection_key = [kp];
                 //each(arr_index_selection, (v) => {
                 //    selection_key.push(v);
                 //});
-
-                console.log('kp', kp);
+                //console.log('kp', kp);
 
                 var encoded = Binary_Encoding.encode_to_buffer(arr_index_selection, kp);
-                console.log('encoded', encoded);
-                throw 'stop';
-
-
+                //console.log('encoded', encoded);
+                //throw 'stop';
 
                 this.count_keys_beginning(encoded, callback);
-
                 // then get count with that key prefix
                 //  count keys starting
-
-
                 // encode the key
-
                 //var encoded = Binary_Encoding.encode_to_buffer(arr_index_selection, kp);
                 //console.log('encoded', encoded);
 
@@ -1450,8 +1429,6 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
     }
 
     /**
-     * 
-     * 
      * @param {any} table_name 
      * @param {any} arr_index_selection 
      * @param {any} callback 
@@ -1463,21 +1440,16 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
             if (table) {
                 var kp = table.key_prefix + 1;
                 //this.ll_get_records_by_key_prefix(kp, callback);
-
                 // compose the selection key
-
                 //var selection_key = [kp];
                 //each(arr_index_selection, (v) => {
                 //    selection_key.push(v);
                 //});
-
+            
                 var encoded = Binary_Encoding.encode_to_buffer(arr_index_selection, kp);
-                console.log('encoded', encoded);
-
+                // however, the index selection is 
+                //console.log('encoded', encoded);
                 // then encode the selection key
-
-
-
             } else {
                 callback('Table ' + table_name + ' not found');
             }
@@ -1492,23 +1464,16 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
             var pos = 0, i_num, i_sub_evt_type;
             //console.log('xas2.read', xas2.read);
             //console.log('xas2', xas2);
-
             //console.log('xas2.read', typeof xas2.read);
-
             //console.log('ll_subscription_event', ll_subscription_event);
-
-
 
             [i_num, pos] = xas2.read(ll_subscription_event, pos);
             [i_sub_evt_type, pos] = xas2.read(ll_subscription_event, pos);
-
 
             var buf_the_rest = Buffer.alloc(ll_subscription_event.length - pos);
             ll_subscription_event.copy(buf_the_rest, 0, pos);
 
             var res = {};
-
-
             if (i_sub_evt_type === SUB_CONNECTED) {
                 console.log('Connected!');
 
@@ -1520,8 +1485,6 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
                 res.client_subscription_id = i_num;
                 res.id = i_num;
                 subscription_event_handler(res);
-
-
 
             } 
 
@@ -1544,10 +1507,7 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
 
                 subscription_event_handler(res);
             }
-
-
-        })
-
+        });
         return unsubscribe;
     }
 
@@ -1556,27 +1516,15 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
             var pos = 0, i_num, i_sub_evt_type;
             [i_num, pos] = xas2.read(ll_subscription_event, pos);
             [i_sub_evt_type, pos] = xas2.read(ll_subscription_event, pos);
-            console.log('[i_num, i_sub_evt_type]', [i_num, i_sub_evt_type]);
-
+            //console.log('[i_num, i_sub_evt_type]', [i_num, i_sub_evt_type]);
 
             var buf_the_rest = Buffer.alloc(ll_subscription_event.length - pos);
             ll_subscription_event.copy(buf_the_rest, 0, pos);
-
-            
-
-            
-            //console.log('xas2.read', xas2.read);
-            //console.log('xas2', xas2);
-
-            //console.log('xas2.read', typeof xas2.read);
-
-            console.log('ll_subscription_event.length', ll_subscription_event.length);
-
-            
+            //console.log('ll_subscription_event.length', ll_subscription_event.length);
 
             var res = {};
             if (i_sub_evt_type === SUB_CONNECTED) {
-                console.log('Connected!');
+                console.log('Connected');
 
                 // When it is connected, we return the subscription id.
                 //console.log('i_num', i_num);
@@ -1586,27 +1534,24 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
                 res.client_subscription_id = i_num;
                 res.id = i_num;
                 subscription_event_handler(res);
-
-
-
             } 
 
             if (i_sub_evt_type === SUB_RES_TYPE_BATCH_PUT) {
                 console.log('SUB_RES_TYPE_BATCH_PUT', SUB_RES_TYPE_BATCH_PUT);
 
-                console.log('buf_the_rest', buf_the_rest);
+                //console.log('buf_the_rest', buf_the_rest);
 
                 res.type = 'batch_put';
 
                 // need to decode the buffer.
                 var row_buffers = Binary_Encoding.get_row_buffers(buf_the_rest);
-                console.log('row_buffers', row_buffers);
+                //console.log('row_buffers', row_buffers);
 
                 each(row_buffers, (rb, i) => {
-                    console.log('row_buffers.length', row_buffers.length);
-                    console.log('rb, i', rb, i);
+                    //console.log('row_buffers.length', row_buffers.length);
+                    //console.log('rb, i', rb, i);
                     var d = Model_Database.decode_model_row(rb);
-                    console.log('d', d);
+                    //console.log('d', d);
                 })
 
                 var decoded_row_buffers = Model_Database.decode_model_rows(row_buffers);
@@ -1617,31 +1562,7 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
 
                 subscription_event_handler(res);
             }
-
-
-            // read a value or two from the subscription first
-
-            //var put_rows_buffers = Binary_Encoding.get_row_buffers(buf_the_rest);
-            //console.log('put_rows_buffers.length', put_rows_buffers.length);
-
-            //var decoded_rows = Model_Database.decode_model_rows(buf_the_rest);
-            /*
-            var row_buffers = Binary_Encoding.get_row_buffers(buf_the_rest);
-            console.log('row_buffers', row_buffers);
-
-            var decoded_rows = Model_Database.decode_model_rows(row_buffers);
-            console.log('decoded_rows', decoded_rows);
-            */
-
-
-            // both batch put and individual puts?
-
-            //  for the moment, don't buffer the puts that go to the client.
-            //   do them all immediately.
-            //   could debounce them up to a limit.
-            //    have a 100ms window where it can receive events for processing in that batch.
-        })
-
+        });
         return unsubscribe;
     }
 
@@ -1656,7 +1577,7 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
                 var buf_kp = xas2(kp).buffer;
                 that.subscribe_key_prefix_puts(buf_kp, subscription_event_handler);
             }
-        })
+        });
     }
 
     get_table_record_field_by_index_lookup(table_name, field_name, index_field_name, index_field_value, callback) {
@@ -1670,7 +1591,6 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
         // A local copy of the Model would help scan the indexes to see which fields are there.
         //  Maintaining the local copy of the Model seems very useful for a lot of functionality.
         //   Nevertheless, it will be useful to be able to operate without a local copy of the model.
-
         
         // Having a copy of the Model on both the client and the server seems very useful.
         //  The server could load its model automatically on load.
@@ -1678,14 +1598,6 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
 
         // There could also be server-side index verification and fixing.
         //  Getting the Model running on the server means the server could properly index rows.
-
-        
-
-
-        
-
-
-
 
         that.get_table_kp_by_name(table_name, (err, kp) => {
             if (err) {
@@ -1696,13 +1608,238 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
 
                 var idx_kp = kp + 1;
                 //  then 
-
-
             }
         })
     }
 
+    iterate_backup_files(path, cb_iteration, cb_done) {
+        //console.log('path', path);
+        //throw 'stop';
+        // iterate files in that path.
+        //  probably best to load them into a buffer and callback with a buffer of the file's info.
+        //  could make other version that provides a file reader.
 
+        // all files in backup directory.
+
+        // cb_done
+        
+        fs.readdir(path, (err, files) => {
+            //console.log('err', err);
+            //console.log('files', files);
+
+            // Looks like this batches up the file reads in the event que / call stack as it calls readFile quickly in succession.
+
+            // Instead use fns.
+
+
+            //Fns().go();
+
+            var fns = Fns();
+
+
+            files.forEach((file => {
+                //console.log(file);
+                //fs.readFile('/etc/passwd', function (err, data ) {
+                // ...
+                //});
+                //console.log('file', file);
+
+                //throw 'stop';
+
+                /*
+                fs.readFile(path + '/' + file, function (err, data) {
+                    if (err) {
+                        console.log('err', err);
+                    } else {
+                        cb_iteration(data, file);
+                    }
+                });
+                */
+
+                fns.push([fs.readFile, [path + '/' + file], (err, res) => {
+                    console.log('file', file);
+                    cb_iteration(res, file);
+                }]);
+            }));
+
+            fns.go(cb_done);
+        });
+
+    }
+
+    validate_last_backup(callback) {
+
+        // Needs to ensure the model is loaded first.
+        //  Load it from the server if its not already.
+
+
+        var that = this;
+
+        that.ensure_model((err, model) => {
+            if (err) { callback(err); } else {
+                last_backup_path((err, lbp) => {
+                    if (err) {
+                        callback(err);
+                    } else {
+                        //console.log('lbp', lbp);
+        
+                        // need a map of table kps.
+        
+                        var map_kps = this.model.map_table_kps;
+                        var table, kp;
+        
+                        // Check the row against the table
+
+                        // and stop function?s
+
+                        var res = true;
+
+                        // Need to indicate when its complete
+
+                        // better iterator needed. want file name too.
+
+                        // iterate backup files, in parallel...
+                        //  meaning different in the event loop.
+                        
+                        var decoded, still_buf_encoded_rows, rows;
+                        that.iterate_backup_files(lbp, (file, file_name) => {
+        
+                            // Could wrap older forms of encoding all within an encoding type.
+                            //  Need to get in the habit of always specifying an encoding type.
+        
+                            //console.log('2) file.length', file.length);
+                            // decode it
+        
+                            // Internal records have got xas2 prefix of 1.
+                            //  Others don't have any xas2 prefix.
+        
+                            // The internal array gets encoded using XAS2 prefixes.
+                            //  It should be possible to label some part of the encoded data as using xas2 prefixes.
+                            //   This would be done during the backup process.
+                            //    During array encoding.
+        
+                            decoded = Binary_Encoding.decode_buffer(file)[0];
+                            //console.log('decoded.length', decoded.length);
+        
+                            // Decode rows from within Binary_Encoding.
+        
+                            still_buf_encoded_rows = Binary_Encoding.get_row_buffers(decoded);
+                            //console.log('still_buf_encoded_rows.length', still_buf_encoded_rows.length);
+        
+                            rows = Model_Database.decode_model_rows(still_buf_encoded_rows);
+        
+                            //console.log('rows', rows);
+
+                            // possibly could do this in a web worker.
+                            
+                            each(rows, (row) => {
+
+                                
+                                kp = row[0][0];
+                                table = map_kps[kp];
+                                //var row_is_valid = validate_row(row);
+                                //console.log('row_is_valid', row_is_valid);
+                                if (!table.validate_row(row)) {
+                                    res = false;
+                                }
+                            });
+                            // Then decode with xas2
+        
+                            //var decoded_2 = Binary_Encoding.decode_buffer(decoded, 0);
+                            //console.log('decoded_2.length', decoded_2.length);
+                        }, (err, res_complete) => {
+                            console.log('files iteration complete');
+                            callback(null, res);
+                        })
+                    }
+                })
+            }
+        });
+
+        
+    }
 }
+
+var last_backup_path = (callback) => {
+    var user_dir = os.homedir();
+    //console.log('user_dir', user_dir);
+    //var docs_dir =
+
+    var path_backups = user_dir + '/NextLevelDB/backups';
+    path_backups = path_backups.split('\\').join('/');
+
+    //exists(path_backups, )
+
+    directory_exists(path_backups, (err, exists) => {
+        if (!exists) {
+            callback(new Error('No backup path found, expected it at:', path_backups));
+        } else {
+            get_directories(path_backups, (err, dirs) => {
+                if (err) { callback(err); } else {
+                    if (dirs.length === 0) {
+                        callback(null, path_backups + '/0000 ' + name);
+                    } else {
+                        dirs.sort();
+                        var last = dirs[dirs.length - 1];
+                        callback(null, path_backups + '/' + last);
+                    }
+                }
+            })
+        }
+    });
+}
+
+var new_backup_path = (name, callback) => {
+    //console.log('new_backup_path');
+    var user_dir = os.homedir();
+    //console.log('user_dir', user_dir);
+    //var docs_dir =
+
+    var path_backups = user_dir + '/NextLevelDB/backups';
+    path_backups = path_backups.split('\\').join('/');
+    //console.log('path_backups', path_backups);
+
+    // ensure that directory exists.
+
+    ensure_exists(path_backups, (err, res) => {
+        //console.log('res', res);
+
+        if (err) { callback(err); } else {
+            get_directories(path_backups, (err, dirs) => {
+                if (err) { callback(err); } else {
+                    //console.log('dirs', dirs);
+
+                    //console.log('2* path_backups', path_backups);
+
+                    if (dirs.length === 0) {
+                        //console.log()
+                        callback(null, path_backups + '/0000 ' + name);
+                    } else {
+                        dirs.sort();
+                        //console.log('dirs', dirs);
+                        var last = dirs[dirs.length - 1];
+                        var str_num = last.split(' ')[0];
+                        //console.log('str_num', str_num);
+
+                        var i_num = parseInt(str_num, 10);
+                        i_num++;
+
+                        var s_num = pad(i_num, 4);
+                        //console.log('s_num', s_num);
+
+                        var res_path = path_backups + '/' + s_num + ' ' + name;
+                        //console.log('res_path', res_path);
+                        //throw 'stop';
+                        callback(null, res_path);
+
+                    }
+                }
+            })
+        }
+    });
+}
+
+NextlevelDB_Client.new_backup_path = new_backup_path;
+NextlevelDB_Client.last_backup_path = last_backup_path;
 
 module.exports = NextlevelDB_Client;
