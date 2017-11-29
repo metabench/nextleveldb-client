@@ -252,15 +252,15 @@ class LL_NextLevelDB_Client extends Evented_Class {
             maxReceivedFrameSize: 512000000,
             maxReceivedMessageSize: 512000000,
             fragmentOutgoingMessages: false,
+            //assembleFragments: false,
             closeTimeout: 10000
         });
 
 		client.on('connectFailed', function(error) {
 			// socket could be closed.
 
-
 			if (error) {
-				//console.log('connectFailed error', error);
+				console.log('connectFailed error', error);
 				//console.log('Object.keys(error)', Object.keys(error)); // [ 'code', 'errno', 'syscall', 'address', 'port' ]
 				callback(error);
 			}
@@ -316,8 +316,10 @@ class LL_NextLevelDB_Client extends Evented_Class {
 
 					//console.log('\nerror', error);
 					//console.log('Object.keys(error)', Object.keys(error));
-					console.log("Connection Error: " + error.toString());
-					//console.log('typeof error', typeof error);
+                    console.log("Connection Error: " + error.toString());
+                    console.log('error', error);
+                    //console.log('typeof error', typeof error);
+                    console.trace();
 
 					var str_err = error.toString();
 
@@ -614,6 +616,7 @@ class LL_NextLevelDB_Client extends Evented_Class {
 
             ws_response_handlers[idx] = null;
         };
+        console.log('send_binary_message buf_2.length', buf_2.length);
         this.websocket_connection.sendBytes(buf_2);
     }
 
@@ -1108,6 +1111,8 @@ class LL_NextLevelDB_Client extends Evented_Class {
     'll_put_records_buffer'(buf_records, callback) {
         // PUT_RECORDS
         var buf_query = Buffer.concat([xas2(LL_PUT_RECORDS).buffer, buf_records]);
+        console.log('buf_query', buf_query);
+
         this.send_binary_message(buf_query, (err, res_binary_message) => {
             if (err) {
                 callback(err);

@@ -42,13 +42,6 @@ var resolve = path.resolve;
 // Carry out replication where it streams from existing server.
 //  Would likely need a little downtime to do the npm update / install.
 
-
-
-
-
-
-
-
 const SUB_CONNECTED = 0;
 const SUB_RES_TYPE_BATCH_PUT = 1;
 
@@ -683,6 +676,10 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
 
         }
     }
+
+    // or just put table?
+    
+
 
     /**
      * 
