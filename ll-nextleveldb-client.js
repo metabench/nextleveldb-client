@@ -11,6 +11,27 @@
 //  Connect to a Database with a Model, and then use that model to persist records.
 //   Could be a route into Active_Record technology.
 
+// Server side indexing now looks like it will be most important to get right soon.
+//  Having a GUI would greatly help admin, but take some time and effort to code.
+//   Could be very useful / essential for running / testing some long-running queries.
+
+// Seems important to get the current things working as well as possible.
+//  Some more lower / mid level functionality towards batch putting records, and having them encoded in possibly different ways.
+
+// Want to be able to put records in the DB with different types of encoding.
+//  Possibly we could make new versions of some lower level functions and use them in the client.
+
+// A sparate client ui app could be made.
+
+
+
+
+
+
+
+
+
+
 var http = require('http');
 var url = require('url');
 var WebSocketClient = require('websocket').client;
@@ -34,6 +55,9 @@ var Binary_Encoding_Record = Binary_Encoding.Record;
 var Model = require('nextleveldb-model');
 var Paging = Model.Paging;
 
+
+// Could put this into node-client.
+//  Would have more node specific features such as backup.
 var fs = require('fs');
 
 // single key / value get or put record, delete
@@ -146,6 +170,9 @@ const LL_COUNT_KEYS_IN_RANGE = 5;
 const LL_GET_FIRST_LAST_KEYS_IN_RANGE = 6;
 
 //const LL_COUNT_GET_FIRST_LAST_KEYS_IN_RANGE = 7;
+
+const INSERT_TABLE_RECORD = 12;
+const INSERT_RECORDS = 13;
 
 const LL_WIPE = 20;
 const LL_WIPE_REPLACE = 21;
@@ -616,7 +643,7 @@ class LL_NextLevelDB_Client extends Evented_Class {
 
             ws_response_handlers[idx] = null;
         };
-        console.log('send_binary_message buf_2.length', buf_2.length);
+        //console.log('send_binary_message buf_2.length', buf_2.length);
         this.websocket_connection.sendBytes(buf_2);
     }
 
@@ -767,6 +794,14 @@ class LL_NextLevelDB_Client extends Evented_Class {
         var paging = new Paging.None();
         var buf_command = xas2(LL_GET_KEYS_IN_RANGE).buffer;
         // the lengths of the buffers too...
+
+        // Should possibly use Binary_Encoding.encode to encode the query.
+        //  May be better than the ad-hoc encoding here.
+        //   Query gets decoded, as-is, when it arrives on the server.
+        //   Some queries would probably wind up a little more verbose, but it would be simpler code.
+
+
+
         var buf_query = Buffer.concat([buf_command, paging.buffer, xas2(buf_l.length).buffer, buf_l, xas2(buf_u.length).buffer, buf_u]);
         //var buf_l = 
         // Include a paging buffer too...?
@@ -863,6 +898,14 @@ class LL_NextLevelDB_Client extends Evented_Class {
             } else {
                 //console.log('res_binary_message', res_binary_message);
                 //console.log('res_binary_message.length', res_binary_message.length);
+
+                // Seems that field names is not getting record keys...
+
+                // Or the records are not being joined or split correctly.
+
+                // It does not quite make sense why getting field names gets a kv array with empty keys.
+                //  Could it have to do with removing key prefixes?
+
                 var arr_kv_buffers = Binary_Encoding.split_length_item_encoded_buffer_to_kv(res_binary_message);
                 //console.log('arr_kv_buffers', arr_kv_buffers);
                 callback(null, arr_kv_buffers);
@@ -870,6 +913,8 @@ class LL_NextLevelDB_Client extends Evented_Class {
         });
 
     }
+
+    // ll_query = send_binary_message?
 
     /**
      * 
@@ -983,8 +1028,6 @@ class LL_NextLevelDB_Client extends Evented_Class {
     // subscribe all
     //  would have multiple callbacks.
     //  function to end the subscription returned.
-
-    
 
 
 	// In nextlevel, the string keys correspond to 64 bit values, stored as integers, represented in hex
@@ -1124,6 +1167,13 @@ class LL_NextLevelDB_Client extends Evented_Class {
             }
         });
     }
+
+
+    // put record
+    //  would need to encode the record.
+
+
+
 
     'll_subscribe_all'(subscription_event_callback) {
 
