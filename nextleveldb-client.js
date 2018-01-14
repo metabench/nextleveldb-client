@@ -1486,7 +1486,8 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
           if (err) {
             callback(err);
           } else {
-            //console.log('* map_field_names', map_field_names);
+            
+            
             let size_diff = 0;
 
             if (arr_record.length < fields_count) {
@@ -1542,7 +1543,7 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
                       let val = arr_record[index_field_id - size_diff];
                       //console.log("val", val);
 
-                      index_values.push(val);
+                      //index_values.push(val);
 
                       // We do want it to return the record id if it finds it.
 
@@ -1557,8 +1558,45 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
 
                       //Model_Database.encode_index_key(table_indexes_kp, table_index_id,
                     } else {
-                      console.trace();
-                      throw "NYI";
+                      //console.trace();
+                      console.log('record', record);
+                      console.log('arr_record', arr_record);
+
+                      let index_value_field_ids = record[1];
+                      console.log('index_value_field_ids', index_value_field_ids);
+                      console.log('size_diff', size_diff);
+
+                      let arr_indexed_values = [];
+                      index_value_field_ids.forEach(id => {
+                        arr_indexed_values.push(arr_record[id - size_diff]);
+                      })
+
+                      let encoded_index_key = Model_Database.encode_index_key(
+                        table_id * 2 + 3,
+                        table_index_id,
+                        arr_indexed_values
+                      );
+                      arr_buf_index_lookup_keys.push(encoded_index_key);
+                      console.log('encoded_index_key', encoded_index_key);
+
+                      // Could previously look up all of the index keys for the records.
+                        
+
+                      // Functions to ensure necessary structures, based on live data, will be a bit tricky.
+                      //  
+
+                      
+
+
+
+
+                      // means there are 2 or more PK values that get pointed to.
+
+
+                        
+
+
+                      //throw "NYI";
                     }
 
                     // then need to construct the index keys using this.
@@ -1701,7 +1739,7 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
             callback(err);
           } else {
             console.log("res_query", res_query);
-            throw "stop";
+            //throw "stop";
 
             // Need to decode the res_query
             //  res_query <Buffer fc 00 25>
