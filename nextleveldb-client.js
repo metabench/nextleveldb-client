@@ -768,6 +768,33 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
         });
     }
 
+    // count_records_by_key_prefix_up_to
+    count_records_by_key_prefix_up_to(i_kp, limit, callback) {
+        console.log('count_records_by_key_prefix_up_to i_kp', i_kp);
+        var buf_kp = xas2(i_kp).buffer;
+        var buf_0 = Buffer.alloc(1);
+        buf_0.writeUInt8(0, 0);
+        var buf_1 = Buffer.alloc(1);
+        buf_1.writeUInt8(255, 0);
+        // and another 0 byte...?
+
+        var buf_l = Buffer.concat([buf_kp, buf_0]);
+        var buf_u = Buffer.concat([buf_kp, buf_1]);
+
+        this.ll_count_keys_in_range_up_to(buf_l, buf_u, limit, (err, res_count) => {
+            if (err) {
+                throw err;
+            } else {
+                console.log('res_count', res_count);
+
+                callback(null, res_count);
+
+                //
+                //throw 'stop';
+            }
+        });
+    }
+
     /**
      *
      *
@@ -2067,6 +2094,38 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
         }
     }
 
+    count_table_records_up_to(table_name, limit, callback) {
+        if (this.model) {
+            var table = this.model.map_tables[table_name];
+            if (table) {
+                var kp = table.key_prefix;
+                this.count_records_by_key_prefix_up_to(kp, limit, callback);
+            } else {
+                callback("Table " + table_name + " not found");
+            }
+        } else {
+
+            // We could look up the key prefix in the database.
+            //  Will make more advanced functionality that does not require having the model loaded on the client - but making use of the client-side model will be available for some more complex features, as well as a
+            //  way to guarantee consistency.
+
+            this.get_table_id_by_name(table_name, (err, table_id) => {
+                if (err) {
+                    callback(err);
+                } else {
+                    let kp = table_id * 2 + 2;
+                    this.count_records_by_key_prefix_up_to(kp, limit, callback);
+
+                }
+            });
+
+
+
+            //throw 'Expected this.model, otherwise can\'t find table by name'
+            //callback("Expected this.model, otherwise can't find table by name");
+        }
+    }
+
     /**
      *
      *
@@ -2116,6 +2175,32 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
             }
         })
     }
+
+    count_each_table_records_up_to(limit, callback) {
+        //console.log('count_each_table_records');
+        this.get_table_names((err, table_names) => {
+            if (err) { callback(err); } else {
+                //console.log('table_names', table_names);
+                let fns = Fns();
+                each(table_names, table_name => {
+                    fns.push([this, this.count_table_records_up_to, [table_name, limit]]);
+                })
+                fns.go((err, res_all) => {
+                    if (err) { callback(err); } else {
+                        //console.log('res_all', res_all);
+                        let res = [];
+
+                        res_all.forEach((v, i) => {
+                            res.push([table_names[i], v]);
+                        })
+                        callback(null, res);
+                    }
+                })
+            }
+        })
+    }
+
+    // ll_count_keys_in_range_up_to
 
     // Call it key selection
     //  or index (key) selection?
@@ -2656,7 +2741,10 @@ if (require.main === module) {
         if (err) {
             throw err;
         } else {
-            lc.count_each_table_records((err, res_count) => {
+
+            // count_each_table_records_up_to
+            // count_each_table_records
+            lc.count_each_table_records_up_to(1000, (err, res_count) => {
                 if (err) {
                     console.trace();
                     throw err;

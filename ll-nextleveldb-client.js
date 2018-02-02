@@ -171,6 +171,8 @@ const LL_GET_FIRST_LAST_KEYS_IN_RANGE = 6;
 
 //const LL_COUNT_GET_FIRST_LAST_KEYS_IN_RANGE = 7;
 
+const LL_COUNT_KEYS_IN_RANGE_UP_TO = 8;
+
 const INSERT_TABLE_RECORD = 12;
 const INSERT_RECORDS = 13;
 
@@ -223,59 +225,59 @@ const ARRAY = 10;
  * @extends {Evented_Class}
  */
 class LL_NextLevelDB_Client extends Evented_Class {
-	//'fields': [
-	//	['url', String],
-	//	['port', Number]
+    //'fields': [
+    //	['url', String],
+    //	['port', Number]
     //],
-    
+
     /**
      * 
      * 
      * @param {object} spec 
      * @memberof LL_NextLevelDB_Client
      */
-    'constructor'(spec) {
+    'constructor' (spec) {
         //console.log('LL_NextLevelDB_Client spec', spec);
 
-		super();
+        super();
 
-		this.server_url = spec.server_url;
-		this.server_address = spec.server_address;
-		this.server_port = spec.server_port;
+        this.server_url = spec.server_url;
+        this.server_address = spec.server_address;
+        this.server_port = spec.server_port;
 
-	}
+    }
 
-	// Want a way to stop / disconnect the client.
-	//  Would be useful to help the program end / release resources.
-
-    /**
-     * 
-    * 
-    * @param {any} callback 
-    * @memberof LL_NextLevelDB_Client
-    */
-    'stop'(callback) {
-		this.auto_reconnect = false;
-		this.websocket_connection.close();
-		if (callback) callback(null, true);
-	}
+    // Want a way to stop / disconnect the client.
+    //  Would be useful to help the program end / release resources.
 
     /**
      * 
-    * 
-    * @param {any} callback 
-    * @memberof LL_NextLevelDB_Client
-    */
-    'start'(callback) {
-		// Maybe connect here?
-		// Better to connect to the socket server
+     * 
+     * @param {any} callback 
+     * @memberof LL_NextLevelDB_Client
+     */
+    'stop' (callback) {
+        this.auto_reconnect = false;
+        this.websocket_connection.close();
+        if (callback) callback(null, true);
+    }
+
+    /**
+     * 
+     * 
+     * @param {any} callback 
+     * @memberof LL_NextLevelDB_Client
+     */
+    'start' (callback) {
+        // Maybe connect here?
+        // Better to connect to the socket server
 
         console.log('NextLevelDB_Client start');
-		var that = this;
+        var that = this;
 
-		this.id_ws_req = 0;
-		var ws_response_handlers = this.ws_response_handlers = {};
-		var client = this.websocket_client = new WebSocketClient({
+        this.id_ws_req = 0;
+        var ws_response_handlers = this.ws_response_handlers = {};
+        var client = this.websocket_client = new WebSocketClient({
             maxReceivedFrameSize: 512000000,
             maxReceivedMessageSize: 512000000,
             fragmentOutgoingMessages: false,
@@ -283,195 +285,195 @@ class LL_NextLevelDB_Client extends Evented_Class {
             closeTimeout: 10000
         });
 
-		client.on('connectFailed', function(error) {
-			// socket could be closed.
+        client.on('connectFailed', function(error) {
+            // socket could be closed.
 
-			if (error) {
-				console.log('connectFailed error', error);
-				//console.log('Object.keys(error)', Object.keys(error)); // [ 'code', 'errno', 'syscall', 'address', 'port' ]
-				callback(error);
-			}
-			//attempting_reconnection = false;
-			//var code = error.code;
-			//var syscall = err.syscall;
-			//console.log('Connect Error: ' + error.toString());
-		});
+            if (error) {
+                console.log('connectFailed error', error);
+                //console.log('Object.keys(error)', Object.keys(error)); // [ 'code', 'errno', 'syscall', 'address', 'port' ]
+                callback(error);
+            }
+            //attempting_reconnection = false;
+            //var code = error.code;
+            //var syscall = err.syscall;
+            //console.log('Connect Error: ' + error.toString());
+        });
 
-		that.connected = false;
-		var attempting_reconnection = false;
+        that.connected = false;
+        var attempting_reconnection = false;
 
-		var reconnection_attempts = function() {
-			first_connect = false;
+        var reconnection_attempts = function() {
+            first_connect = false;
 
-			if (that.connected === false && attempting_reconnection === false) {
-				attempting_reconnection = true;
-				client.connect(ws_address, 'echo-protocol');
-				setTimeout(function() {
-					attempting_reconnection = false;
+            if (that.connected === false && attempting_reconnection === false) {
+                attempting_reconnection = true;
+                client.connect(ws_address, 'echo-protocol');
+                setTimeout(function() {
+                    attempting_reconnection = false;
 
-					reconnection_attempts();
+                    reconnection_attempts();
 
-				}, 1000);
-			}
+                }, 1000);
+            }
 
-		};
+        };
 
-		var first_connect = true;
+        var first_connect = true;
 
-		//console.log('pre connect');
-		client.on('connect', function(connection) {
-			that.websocket_connection = connection;
-			that.auto_reconnect = true;
-			that.connected = true;
+        //console.log('pre connect');
+        client.on('connect', function(connection) {
+            that.websocket_connection = connection;
+            that.auto_reconnect = true;
+            that.connected = true;
 
-			if (!first_connect) {
-				//console.log('pre fns all go');
-				that.fns_on_reconnect.go((err, res_all) => {
-					// Raising the final callback too many times? Currently being called after each operation.
-					//console.log('res_all', res_all);
-				});
-			}
-			attempting_reconnection = false;
-			console.log('WebSocket Client Connected');
-			// if its a reconnection, don't need to assign these things.
+            if (!first_connect) {
+                //console.log('pre fns all go');
+                that.fns_on_reconnect.go((err, res_all) => {
+                    // Raising the final callback too many times? Currently being called after each operation.
+                    //console.log('res_all', res_all);
+                });
+            }
+            attempting_reconnection = false;
+            console.log('WebSocket Client Connected');
+            // if its a reconnection, don't need to assign these things.
 
-			var assign_connection_events = function() {
-				connection.on('error', function(error) {
+            var assign_connection_events = function() {
+                connection.on('error', function(error) {
 
-					// Probably in response to attempting to write to a closed stream?
+                    // Probably in response to attempting to write to a closed stream?
 
 
-					//console.log('\nerror', error);
-					//console.log('Object.keys(error)', Object.keys(error));
+                    //console.log('\nerror', error);
+                    //console.log('Object.keys(error)', Object.keys(error));
                     console.log("Connection Error: " + error.toString());
                     console.log('error', error);
                     //console.log('typeof error', typeof error);
                     console.trace();
 
-					var str_err = error.toString();
+                    var str_err = error.toString();
 
-					if (str_err === 'Error: This socket is closed') {
+                    if (str_err === 'Error: This socket is closed') {
 
-						// disconnect event.
-						that.connected = false;
-						attempting_reconnection = false;
-					}
-				});
-				connection.on('connectFailed', function(error) {
+                        // disconnect event.
+                        that.connected = false;
+                        attempting_reconnection = false;
+                    }
+                });
+                connection.on('connectFailed', function(error) {
 
-					console.log('connection failed, err', err);
+                    console.log('connection failed, err', err);
 
-					// Probably in response to attempting to write to a closed stream?
+                    // Probably in response to attempting to write to a closed stream?
 
-					//console.log('\nerror', error);
-					//console.log('Object.keys(error)', Object.keys(error));
-					//console.log("Connection Error: " + error.toString());
-					//console.log('typeof error', typeof error);
+                    //console.log('\nerror', error);
+                    //console.log('Object.keys(error)', Object.keys(error));
+                    //console.log("Connection Error: " + error.toString());
+                    //console.log('typeof error', typeof error);
 
-					//attempting_reconnection = false;
-					//reconnection_attempts();
+                    //attempting_reconnection = false;
+                    //reconnection_attempts();
 
-				});
-				connection.on('close', function() {
-					console.log('echo-protocol Connection Closed');
+                });
+                connection.on('close', function() {
+                    console.log('echo-protocol Connection Closed');
 
 
 
-					// At this point its worth noticing the connection has been closed.
-					// When the connection is closed, don't try to send.
-					that.connected = false;
-					attempting_reconnection = false;
-					first_connect = false;
-					// attempt reconnections...
-					//fns_on_reconnect = Fns();
-					that.fns_on_reconnect = Fns();
+                    // At this point its worth noticing the connection has been closed.
+                    // When the connection is closed, don't try to send.
+                    that.connected = false;
+                    attempting_reconnection = false;
+                    first_connect = false;
+                    // attempt reconnections...
+                    //fns_on_reconnect = Fns();
+                    that.fns_on_reconnect = Fns();
 
-					if (that.auto_reconnect) {
+                    if (that.auto_reconnect) {
                         reconnection_attempts();
-					}
+                    }
 
 
-				});
-                connection.on('message', function (message) {
+                });
+                connection.on('message', function(message) {
                     //console.log('message', message);
-					if (message.type === 'utf8') {
-						//console.log("Received: '" + message.utf8Data + "'");
-						//console.log('message', message);
+                    if (message.type === 'utf8') {
+                        //console.log("Received: '" + message.utf8Data + "'");
+                        //console.log('message', message);
 
-						// Could have a message saying that a request has been completed, or started.
-						//
-
-
-						// Processing the responses to the streaming requests.
-						//  tell if it is a block or the whole message.
-
-						// assume whole message for the moment
+                        // Could have a message saying that a request has been completed, or started.
+                        //
 
 
+                        // Processing the responses to the streaming requests.
+                        //  tell if it is a block or the whole message.
 
-
-						var obj_message = JSON.parse(message.utf8Data);
+                        // assume whole message for the moment
 
 
 
-						//console.log('1) typeof obj_message', typeof obj_message);
-						//console.log('obj_message', obj_message);
 
-						// Seems like its been encoded wrong on the server.
-
-						if (is_array(obj_message)) {
-
-							// No, the result could be an array.
-							//  Depends on if we are expecting an array to be returned or not.
-
-							//  Though all returns should be an array, with the first item as the request key?
-							//   The second as the results?
+                        var obj_message = JSON.parse(message.utf8Data);
 
 
 
-							var request_key = obj_message[0];
+                        //console.log('1) typeof obj_message', typeof obj_message);
+                        //console.log('obj_message', obj_message);
 
-							//console.log('request_key', request_key);
+                        // Seems like its been encoded wrong on the server.
 
-							// and the response could be an array, ort one object.
+                        if (is_array(obj_message)) {
 
-							var res;
+                            // No, the result could be an array.
+                            //  Depends on if we are expecting an array to be returned or not.
 
-							if (obj_message.length === 2) {
-								res = obj_message[1];
-							} else {
-								res = obj_message.slice(1);
-							}
+                            //  Though all returns should be an array, with the first item as the request key?
+                            //   The second as the results?
 
-							//console.log('* res', res);
 
-							// Call the response handler.
 
-							//ws_response_handlers[]
+                            var request_key = obj_message[0];
 
-							//console.log('ws_response_handlers', ws_response_handlers);
-							//console.log('request_key', request_key);
+                            //console.log('request_key', request_key);
 
-							if (ws_response_handlers[request_key]) {
-								ws_response_handlers[request_key](res);
-							}
+                            // and the response could be an array, ort one object.
 
-						}
-						// The message may say it's a response.
-						//  Then to which query
+                            var res;
 
-						if (obj_message.type === 'response') {
-							// then see what the request key is
-							var request_key = obj_message.request_key;
+                            if (obj_message.length === 2) {
+                                res = obj_message[1];
+                            } else {
+                                res = obj_message.slice(1);
+                            }
 
-							// Is it the full response, or a chunk/block?
-							//  May be known or estimated number of blocks, or unknown.
+                            //console.log('* res', res);
 
-							if (ws_response_handlers[request_key]) {
-								//console.log('pre call request handler');
-								ws_response_handlers[request_key](obj_message);
-							}
-						}
+                            // Call the response handler.
+
+                            //ws_response_handlers[]
+
+                            //console.log('ws_response_handlers', ws_response_handlers);
+                            //console.log('request_key', request_key);
+
+                            if (ws_response_handlers[request_key]) {
+                                ws_response_handlers[request_key](res);
+                            }
+
+                        }
+                        // The message may say it's a response.
+                        //  Then to which query
+
+                        if (obj_message.type === 'response') {
+                            // then see what the request key is
+                            var request_key = obj_message.request_key;
+
+                            // Is it the full response, or a chunk/block?
+                            //  May be known or estimated number of blocks, or unknown.
+
+                            if (ws_response_handlers[request_key]) {
+                                //console.log('pre call request handler');
+                                ws_response_handlers[request_key](obj_message);
+                            }
+                        }
                     }
 
                     // binary messages.
@@ -487,34 +489,34 @@ class LL_NextLevelDB_Client extends Evented_Class {
                     // Could have Message classes to interpret and encode messages.
 
 
-				});
-			};
+                });
+            };
 
-			assign_connection_events();
+            assign_connection_events();
 
-			if (first_connect) {
-				callback(null, true);
-			};
+            if (first_connect) {
+                callback(null, true);
+            };
 
-			// Will send data, in general.
-			//  It may be best if there is a response saying it has been received.
+            // Will send data, in general.
+            //  It may be best if there is a response saying it has been received.
 
-			// May also send queries.
-			//  The client will then receive the response, labelled with a key identifying it as corresponding with the query, and also in chunks.
+            // May also send queries.
+            //  The client will then receive the response, labelled with a key identifying it as corresponding with the query, and also in chunks.
 
-			//sendNumber();
+            //sendNumber();
 
-		});
-		// need the url without the protocol.
+        });
+        // need the url without the protocol.
 
 
 
-		var ws_address = this.server_url || 'ws://' + this.server_address + ':' + this.server_port + '/';
+        var ws_address = this.server_url || 'ws://' + this.server_address + ':' + this.server_port + '/';
         //console.log('ws_address', ws_address);
         //console.log('pre client.connect');
-		client.connect(ws_address, 'echo-protocol');
+        client.connect(ws_address, 'echo-protocol');
     }
-    
+
     /**
      * 
      * 
@@ -576,15 +578,15 @@ class LL_NextLevelDB_Client extends Evented_Class {
         });
     }
 
-	// put timeseries value
+    // put timeseries value
 
-	// just put a single timeseries value into the system.
-	//  can create a new key with this when using the high level interface too.
+    // just put a single timeseries value into the system.
+    //  can create a new key with this when using the high level interface too.
 
-	// can send a string formatted date over to the server.
-	// can do this with an array of params
+    // can send a string formatted date over to the server.
+    // can do this with an array of params
 
-	// bid, ask, volume
+    // bid, ask, volume
 
     /**
      * 
@@ -623,11 +625,12 @@ class LL_NextLevelDB_Client extends Evented_Class {
 
         // Better to stream this message to the server.
         //  Probably best to always use the streaming connection.
-        var idx = this.id_ws_req++, ws_response_handlers = this.ws_response_handlers;
+        var idx = this.id_ws_req++,
+            ws_response_handlers = this.ws_response_handlers;
 
         var buf_2 = Buffer.concat([xas2(idx).buffer, message]);
 
-        ws_response_handlers[idx] = function (obj_message) {
+        ws_response_handlers[idx] = function(obj_message) {
             //console.log('ws response: ', idx, obj_message);
 
             // Maybe remove the message id/idx from the message.
@@ -651,12 +654,13 @@ class LL_NextLevelDB_Client extends Evented_Class {
     //  Keeps the response handler until its closed / unsubscribed.
 
     send_binary_subscription_message(message, subscription_event_callback) {
-        var idx = this.id_ws_req++, ws_response_handlers = this.ws_response_handlers;
-        
+        var idx = this.id_ws_req++,
+            ws_response_handlers = this.ws_response_handlers;
+
         var buf_2 = Buffer.concat([xas2(idx).buffer, message]);
         var that = this;
 
-        ws_response_handlers[idx] = function (obj_message) {
+        ws_response_handlers[idx] = function(obj_message) {
 
             console.log('obj_message', obj_message);
             // May need to decode the message (somewhat) to read the initial subscription id.
@@ -689,7 +693,7 @@ class LL_NextLevelDB_Client extends Evented_Class {
 
             that.websocket_connection.sendBytes(buf_2);
 
-            
+
 
         }
 
@@ -703,11 +707,11 @@ class LL_NextLevelDB_Client extends Evented_Class {
 
 
 
-    
+
 
 
     //ll_get_table_records_by_kp(table_key_prefix, callback) {
-        
+
     //}
 
     /**
@@ -877,8 +881,8 @@ class LL_NextLevelDB_Client extends Evented_Class {
 
     // ll ll_get_records_in_range no split
 
-    
-    
+
+
     ll_get_records_in_range(buf_l, buf_u, callback) {
         // table prefix number, then the rest of the pk
         // need to know the table key prefixes.
@@ -989,6 +993,21 @@ class LL_NextLevelDB_Client extends Evented_Class {
         this.ll_count_keys_in_range(buf_l, buf_u, callback);
     }
 
+    ll_count_keys_beginning_up_to(buf_beginning, limit, callback) {
+        var buf_0 = Buffer.alloc(1);
+        buf_0.writeUInt8(0, 0);
+        var buf_1 = Buffer.alloc(1);
+        buf_1.writeUInt8(255, 0);
+        // and another 0 byte...?
+
+        var buf_l = Buffer.concat([buf_beginning, buf_0]);
+        var buf_u = Buffer.concat([buf_beginning, buf_1]);
+
+        this.ll_count_keys_in_range_up_to(buf_l, buf_u, limit, callback);
+    }
+
+    // keys beginning up to
+
     // Need to count the keys for a range of table keys
     //  Need to adapt this to deal with table prefixes.
 
@@ -1025,12 +1044,40 @@ class LL_NextLevelDB_Client extends Evented_Class {
         });
     }
 
+    // LL_COUNT_KEYS_IN_RANGE_UP_TO
+    ll_count_keys_in_range_up_to(buf_l, buf_u, limit, callback) {
+        var paging = new Paging.None();
+        var buf_command = xas2(LL_COUNT_KEYS_IN_RANGE_UP_TO).buffer;
+        // the lengths of the buffers too...
+        var buf_query = Buffer.concat([buf_command, paging.buffer, xas2(limit).buffer, xas2(buf_l.length).buffer, buf_l, xas2(buf_u.length).buffer, buf_u]);
+        //var buf_l = 
+        // Include a paging buffer too...?
+
+        //console.log('buf_query', buf_query);
+        this.send_binary_message(buf_query, (err, res_binary_message) => {
+            if (err) {
+                callback(err);
+            } else {
+                //console.log('res_binary_message', res_binary_message);
+                // xas2 decoding
+                var count, pos;
+                [count, pos] = xas2.read(res_binary_message, 0);
+                //console.log('count', count);
+
+                //var arr_kv_buffers = Binary_Encoding.split_length_item_encoded_buffer_to_kv(res_binary_message);
+                callback(null, count);
+            }
+        });
+    }
+
+
+
     // subscribe all
     //  would have multiple callbacks.
     //  function to end the subscription returned.
 
 
-	// In nextlevel, the string keys correspond to 64 bit values, stored as integers, represented in hex
+    // In nextlevel, the string keys correspond to 64 bit values, stored as integers, represented in hex
 
 
     // A paging option.
@@ -1044,7 +1091,7 @@ class LL_NextLevelDB_Client extends Evented_Class {
 
     // Lower level get all keys
     //  Lower level meaning it more directly interacts with the LevelDB, including index rows an other non-record values.
-    
+
 
     /**
      * 
@@ -1053,7 +1100,7 @@ class LL_NextLevelDB_Client extends Evented_Class {
      * @param {any} callback 
      * @memberof LL_NextLevelDB_Client
      */
-    'll_get_all_keys'(paging, callback) {
+    'll_get_all_keys' (paging, callback) {
         var buf_query, pos = 0;
         if (!callback) {
             callback = arguments[0];
@@ -1066,7 +1113,7 @@ class LL_NextLevelDB_Client extends Evented_Class {
         //if (paging) {
         buf_query = Buffer.concat([xas2(LL_GET_ALL_KEYS).buffer, paging.buffer]);
         //} else {
-            //buf_query = Buffer.concat([xas2(GET_ALL_KEYS).buffer]);
+        //buf_query = Buffer.concat([xas2(GET_ALL_KEYS).buffer]);
         //}
 
         this.send_binary_message(buf_query, (err, res_binary_message) => {
@@ -1108,7 +1155,7 @@ class LL_NextLevelDB_Client extends Evented_Class {
                 callback(null, res_binary_message);
             }
         });
-		//this._json_get_request('query/all_keys', callback);
+        //this._json_get_request('query/all_keys', callback);
     }
 
     /**
@@ -1117,7 +1164,7 @@ class LL_NextLevelDB_Client extends Evented_Class {
      * @param {any} callback 
      * @memberof LL_NextLevelDB_Client
      */
-    'll_count_records'(callback) {
+    'll_count_records' (callback) {
         // Probably best to encode a binary query.
 
         // could just be query 0
@@ -1151,7 +1198,7 @@ class LL_NextLevelDB_Client extends Evented_Class {
      * @param {any} callback 
      * @memberof LL_NextLevelDB_Client
      */
-    'll_put_records_buffer'(buf_records, callback) {
+    'll_put_records_buffer' (buf_records, callback) {
         // PUT_RECORDS
         var buf_query = Buffer.concat([xas2(LL_PUT_RECORDS).buffer, buf_records]);
         console.log('buf_query', buf_query);
@@ -1175,7 +1222,7 @@ class LL_NextLevelDB_Client extends Evented_Class {
 
 
 
-    'll_subscribe_all'(subscription_event_callback) {
+    'll_subscribe_all' (subscription_event_callback) {
 
         // Or two callbacks - for subscription set up, and subscription event.
 
@@ -1209,8 +1256,8 @@ class LL_NextLevelDB_Client extends Evented_Class {
 
     }
 
-    'll_subscribe_key_prefix_puts'(buf_kp, subscription_event_callback) {
-        
+    'll_subscribe_key_prefix_puts' (buf_kp, subscription_event_callback) {
+
         // Or two callbacks - for subscription set up, and subscription event.
 
 
@@ -1256,23 +1303,23 @@ class LL_NextLevelDB_Client extends Evented_Class {
 // need different create_ws_followthrough functions for each prototype.
 
 var local_info = {
-	'server_address': 'localhost',
-	//'server_address': 'localhost',
-	//'db_path': 'localhost',
-	'server_port': 420
+    'server_address': 'localhost',
+    //'server_address': 'localhost',
+    //'db_path': 'localhost',
+    'server_port': 420
 }
 
 
 if (require.main === module) {
-	var lc = new NextLevelDB_Client(local_info);
+    var lc = new NextLevelDB_Client(local_info);
 
-	// Looks like the level client keeps itself open.
-	//  console.log('pre start');
+    // Looks like the level client keeps itself open.
+    //  console.log('pre start');
 
-	lc.start((err, res_start) => {
-		if (err) {
-			throw err;
-		} else {
+    lc.start((err, res_start) => {
+        if (err) {
+            throw err;
+        } else {
             console.log('res_start', res_start);
 
             // count all records.
@@ -1282,17 +1329,17 @@ if (require.main === module) {
             //});
 
 
-			var test_get_all_records = function() {
-                // And different tests for using paging.
-				
-            };
-
-            var test_get_all_records_100_per_page = function () {
+            var test_get_all_records = function() {
                 // And different tests for using paging.
 
             };
 
-            var test_get_all_keys = function () {
+            var test_get_all_records_100_per_page = function() {
+                // And different tests for using paging.
+
+            };
+
+            var test_get_all_keys = function() {
                 // And different tests for using paging.
                 lc.ll_get_all_keys((err, buf_all_keys) => {
                     // Should get them as an array.
@@ -1354,7 +1401,7 @@ if (require.main === module) {
             //    More intelligence on the client-side, but server-side will have sufficient capabilities.
             //  Leaving the server running without changing the code is a goal.
 
-			//test_get_all_records();
+            //test_get_all_records();
 
             // This may have a variety of test procedures.
             //  
@@ -1364,61 +1411,61 @@ if (require.main === module) {
 
             // Probably don't save records like this.
 
-			var test_save_all_records = function() {
-				fs.open('dbsave.nl', 'w', (err, write_file_descriptor) => {
-					if (err) {
-						throw err;
-					} else {
-						lc.ws_streaming_get_all_records((err, res_get_all_records) => {
-							if (err) {
-								throw err;
-							} else {
+            var test_save_all_records = function() {
+                fs.open('dbsave.nl', 'w', (err, write_file_descriptor) => {
+                    if (err) {
+                        throw err;
+                    } else {
+                        lc.ws_streaming_get_all_records((err, res_get_all_records) => {
+                            if (err) {
+                                throw err;
+                            } else {
 
-								var page_num = res_get_all_records[0];
-								var page_arr_records = res_get_all_records[1];
+                                var page_num = res_get_all_records[0];
+                                var page_arr_records = res_get_all_records[1];
 
-								console.log('page_num', page_num);
-								console.log('page_arr_records.length', page_arr_records.length);
+                                console.log('page_num', page_num);
+                                console.log('page_arr_records.length', page_arr_records.length);
 
-								// try writing it as JSON
+                                // try writing it as JSON
 
-								each(page_arr_records, (record) => {
-									fs.write(write_file_descriptor, JSON.stringify(record));
-								});;
+                                each(page_arr_records, (record) => {
+                                    fs.write(write_file_descriptor, JSON.stringify(record));
+                                });;
 
-							}
-						});
-					}
-				});
-			};
-			//test_save_all_records();
+                            }
+                        });
+                    }
+                });
+            };
+            //test_save_all_records();
 
-			// Subscriptions...
-			//  Could send the subscribe functions as normal.
-			//  Would be processed differently on the server.
-			//   Will have an unsubscribe method or two.
+            // Subscriptions...
+            //  Could send the subscribe functions as normal.
+            //  Would be processed differently on the server.
+            //   Will have an unsubscribe method or two.
 
-			var test_subscribe_put = () => {
-				// Subscriptions don't get error events back?
-				//  Is that the difference?
-				//  Maybe don't do it that way for the moment.
+            var test_subscribe_put = () => {
+                // Subscriptions don't get error events back?
+                //  Is that the difference?
+                //  Maybe don't do it that way for the moment.
 
-				lc.ws_subscribe('put', (pointless_error, e_put) => {
+                lc.ws_subscribe('put', (pointless_error, e_put) => {
 
-					console.log('e_put', e_put);
-				});
-			};
-			//test_subscribe_put();
-            
+                    console.log('e_put', e_put);
+                });
+            };
+            //test_subscribe_put();
 
-		}
-	});
-	//console.log('pre get all');
 
-	var all_data = [];
+        }
+    });
+    //console.log('pre get all');
+
+    var all_data = [];
 
 } else {
-	//console.log('required as a module');
+    //console.log('required as a module');
 }
 
 
