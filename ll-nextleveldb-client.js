@@ -799,20 +799,20 @@ class LL_NextLevelDB_Client extends Evented_Class {
     'll_subscribe_all' (subscription_event_callback) {
         var buf_query = Buffer.concat([xas2(LL_SUBSCRIBE_ALL).buffer]);
         var unsubscribe = this.send_binary_subscription_message(buf_query, (sub_event) => {
-            console.log('sub_event', sub_event);
+            //console.log('sub_event', sub_event);
             subscription_event_callback(sub_event);
         });
         return unsubscribe;
     }
 
     'll_subscribe_key_prefix_puts' (buf_kp, subscription_event_callback) {
-        console.log('buf_kp', buf_kp);
-        console.log('1) buf_kp hex', buf_kp.toString('hex'));
+        //console.log('buf_kp', buf_kp);
+        //console.log('1) buf_kp hex', buf_kp.toString('hex'));
         var buf_query = Buffer.concat([xas2(LL_SUBSCRIBE_KEY_PREFIX_PUTS).buffer, buf_kp]);
 
 
         var unsubscribe = this.send_binary_subscription_message(buf_query, (sub_event) => {
-            console.log('sub_event', sub_event);
+            //console.log('sub_event', sub_event);
 
             // still a low level function.
             //  just deals with the binary data.
