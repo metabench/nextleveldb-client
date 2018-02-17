@@ -55,6 +55,9 @@ const INSERT_TABLE_RECORD = 12;
 //   Not using a local model, downloads the index field data and decodes it. ???
 //   Model is specifically designed to encode / decode index and field data and connect it to definitions.
 
+
+
+
 // Maybe it would be possible to obtain part of the model from the server and use that?
 
 // Should not assume there is a client-side model for some functions?
@@ -70,8 +73,8 @@ const KP_CORE_UPPER = 9;
 const SUB_CONNECTED = 0;
 const SUB_RES_TYPE_BATCH_PUT = 1;
 
-var directory_exists = function(path, callback) {
-    fs.stat(resolve(path), function(err, stat) {
+var directory_exists = function (path, callback) {
+    fs.stat(resolve(path), function (err, stat) {
         if (err) {
             return callback(false);
         }
@@ -85,7 +88,7 @@ function ensure_directory_exists(path, mask, cb) {
         cb = mask;
         mask = 0777;
     }
-    fs.mkdir(path, mask, function(err) {
+    fs.mkdir(path, mask, function (err) {
         if (err) {
             if (err.code == "EEXIST")
                 cb(null); // ignore the error if the folder already exists
@@ -94,43 +97,11 @@ function ensure_directory_exists(path, mask, cb) {
     });
 }
 
-/*
-var get_directories = function(dir, cb) { 
-    console.log('get_directories', dir);
-
-
-    fs.readdir(dir, function(err, files) {
-        var dirs = [],
-        filePath,
-        
-        checkDirectory = function(err, stat) {
-            if(stat.isDirectory()) {
-                dirs.push(files[i]);
-            }
-            if(i + 1 === l) { // last record
-                cb(null, dirs);
-            }
-        };
-        //console.log('files', files);
-
-        for(var i=0, l=files.length; i<l; i++) {
-            if(files[i][0] !== '.') { // ignore hidden
-                filePath = dir+'/'+files[i];
-                fs.stat(filePath, checkDirectory);
-            }
-        }
-        if (files.length === 0) {
-            cb(null, []);
-        }
-    });
-}
-*/
-
-var get_directories = function(dir, cb) {
+var get_directories = function (dir, cb) {
     //dir = dir.split('/').join('\\');
 
     //console.log('* get_directories', dir);
-    fs.readdir(dir, function(err, files) {
+    fs.readdir(dir, function (err, files) {
         if (err) {
             //console.log('err', err);
             //throw err;
@@ -143,7 +114,7 @@ var get_directories = function(dir, cb) {
                 i = 0,
                 d = 0;
 
-            checkDirectory = function(err, stat) {
+            checkDirectory = function (err, stat) {
                 //console.log('checkDirectory');
                 if (stat.isDirectory()) {
                     dirs.push(files[d]);
@@ -324,6 +295,8 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
                 //console.log('res_all', JSON.stringify(res_all));
                 //console.log('res_all.length', res_all.length);
 
+                // But what about the incrementor values?
+
                 each(res_all, (table_records, table_index) => {
                     var table_name = arr_table_names[table_index];
                     //console.log('table_name', table_name);
@@ -369,9 +342,7 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
         //  then load other tables
 
         // can we load multiple tables at once from the server into one buffer?
-
         // or load the tables individually.
-
         var that = this;
         this.load_core((err, model) => {
             if (err) {
@@ -387,7 +358,6 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
     }
 
     // Time-Value type data, being turned into records.
-
     // Defining and using record transformations (based on types, types could be defined in Model)
     /**
      *
@@ -426,15 +396,10 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
                             callback(err);
                         } else {
                             console.log("table.records.length", table.records.length);
-
                             // search for index that are missing.
-
                             // table get arr data index rows
-
                             var table_index_records = table.get_arr_data_index_records();
-
                             // then we see which are missing from remote
-
                             console.log("index_records", index_records);
                             console.log("index_records.length", index_records.length);
                             console.log(
@@ -818,6 +783,70 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
     // function to get the decoded records by key prefix
 
     //
+
+    get_table_records_by_key_beginning(table_name, key_beginning, callback) {
+
+        this.get_table_kp_by_name(table_name, (err, kp) => {
+            if (err) {
+                throw err;
+            } else {
+
+                // need to build up the buffer here.
+
+                // the kp in the buffer and then they keys
+
+                let buf_key = Model_Database.encode_key(kp, key_beginning);
+                console.log('buf_key', buf_key);
+                // Keys seem wrong
+                //  Could get all of the buffer keys from that table to compare.
+
+                this.get_table_keys('bittrex markets', (err, keys) => {
+                    if (err) {
+                        callback(err);
+                    } else {
+                        console.log('keys', keys);
+
+                        this.ll_get_records_keys_beginning(buf_key, (err, encoded_records) => {
+                            if (err) {
+                                callback(err);
+                            } else {
+                                const remove_kp = 1;
+                                // Not sure this will decode index records.
+                                //  Could check to see if the kp is odd in this case?
+
+                                //console.log('encoded_records', encoded_records);
+
+                                var res = Model_Database.decode_model_rows(encoded_records, remove_kp);
+
+                                console.log('res', res);
+                                console.trace();
+                                throw 'stop';
+
+                                // While removing the key prefix.
+
+                                callback(null, res);
+                            }
+                        });
+                    }
+                })
+            }
+        })
+    }
+
+
+    get_records_by_key_prefix(key_prefix, callback) {
+        this.ll_get_records_by_key_prefix(key_prefix, (err, encoded_records) => {
+            if (err) {
+                callback(err);
+            } else {
+                const remove_kp = 1;
+                var res = Model_Database.decode_model_rows(encoded_records, remove_kp);
+                // While removing the key prefix.
+                callback(null, res);
+            }
+        });
+    }
+
     // get_decoded_records_by_key_prefix
     /**
      *
@@ -826,8 +855,9 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
      * @param {any} callback
      * @memberof NextlevelDB_Client
      */
-    get_records_by_key_prefix(key_prefix, callback) {
-        this.ll_get_records_by_key_prefix(key_prefix, (err, encoded_records) => {
+
+    get_records_by_key_prefix_up_to(key_prefix, limit, callback) {
+        this.ll_get_records_by_key_prefix_up_to(key_prefix, limit, (err, encoded_records) => {
             if (err) {
                 callback(err);
             } else {
@@ -840,6 +870,7 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
             }
         });
     }
+
 
     /**
      * @param {any} table_name
@@ -857,8 +888,63 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
             }
         } else {
             //throw 'Expected this.model, otherwise can\'t find table by name'
-            callback("Expected this.model, otherwise can't find table by name");
+
+            this.get_table_kp_by_name(table_name, (err, kp) => {
+                if (err) {
+                    callback(err);
+                } else {
+                    this.get_records_by_key_prefix(kp, callback);
+                }
+            })
+
+            //callback("Expected this.model, otherwise can't find table by name");
         }
+    }
+
+
+
+
+    // get_table_records_up_to
+
+    get_table_records_up_to(table_name, limit, callback) {
+        if (this.model) {
+            var table = this.model.map_tables[table_name];
+            if (table) {
+                var kp = table.key_prefix;
+                this.get_records_by_key_prefix_up_to(kp, limit, callback);
+            } else {
+                callback("Table " + table_name + " not found");
+            }
+        } else {
+            //throw 'Expected this.model, otherwise can\'t find table by name'
+
+            this.get_table_kp_by_name(table_name, (err, kp) => {
+                if (err) {
+                    callback(err);
+                } else {
+                    this.get_records_by_key_prefix_up_to(kp, limit, callback);
+                }
+            })
+
+            //callback("Expected this.model, otherwise can't find table by name");
+        }
+    }
+
+    // key beginning rather than key prefix
+    //  could be the full key
+    get_table_records_by_key(table_name, key, callback) {
+        this.get_table_kp_by_name(table_name, (err, kp) => {
+            // then encode a buffer with that kp and key
+            let buf_key = Model_Database.encode_key(kp, key);
+            console.log('buf_key', buf_key);
+
+            // then search by key (prefix)
+            //  it's the beginning of the key.
+
+            this.get_records_by_key_prefix(buf_key, callback);
+
+            //throw 'stop';
+        });
     }
 
     // get_table_flat_records
@@ -1169,6 +1255,7 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
             if (err) {
                 callback(err);
             } else {
+                //console.log('ll_res', ll_res);
                 var res = Model_Database.decode_keys(ll_res);
                 callback(null, res);
             }
@@ -1308,40 +1395,97 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
         });
     }
 
+    get_table_fields_records(table_name, callback) {
+        const table_fields_kp = TABLE_FIELDS_TABLE_ID * 2 + 2;
+        this.get_table_id_by_name(table_name, (err, table_id) => {
+            if (err) {
+                callback(err);
+            } else {
+                const buf = Model_Database.encode_key(table_fields_kp, [table_id]);
+                this.get_records_by_key_prefix(buf, (err, fields_records) => {
+                    if (err) {
+                        callback(err);
+                    } else {
+                        //let res = [];
+                        //each(fields_records, record => {
+                        //    res.push(record[1][0]);
+                        //});
+                        callback(null, fields_records);
+                    }
+                });
+            }
+        });
+    }
+
+    // Table initially gets set up in the crypto data model.
+    //  Perhaps, some kind of active record system could persist data.
+
+
+    // Maybe these fields should have types set from the beginning.
+    //  That would help with record validation.
+
+    get_table_fields_info(table_name, callback) {
+
+        // Looking up the references, and the types, will help 
+
+        // Getting the info on native types makes sense here.
+        //  Basically get the native type table records.
+        //  A map of the native types seems best.
+
+        this.get_table_fields_records(table_name, (err, records) => {
+            if (err) {
+                callback(err);
+            } else {
+                let k = [],
+                    v = [],
+                    res = [k, v];
+
+                records.forEach((item, index) => {
+                    let i2 = item[1];
+                    let is_pk = i2[2];
+                    let name = i2[0];
+                    let i_fk_to = i2[3];
+                    // It's the native type id.
+
+
+
+                    //let s_type =
+                    if (is_pk) {
+                        k.push(name);
+                    } else {
+                        v.push(name);
+                    }
+                })
+                callback(null, res);
+            }
+        })
+    }
+
+    // get the table field records as arrays?
+
+    // Want to be able to verify that records going into the DB are in the right format.
+
+    // A function to generate sample records with the right types could be useful.
+
+    // get them as loaded parts of the model?
+    //  I think this needs to run separately from the model.
+    //  The model will help with consistency, as well as more complicated operations, such as creating a new DB from scratch.
+
     // get_table_kv_field_names
 
     get_table_kv_field_names(table_name, callback) {
         // look up the table id
-
         const that = this;
 
-        // Will do this on a lower level.
-
         const table_fields_kp = TABLE_FIELDS_TABLE_ID * 2 + 2;
-
-        // then we lookup the fields for that table by id.
-
-        // get the table fields.
-        //  Thought I'd done that.
-
         // Get the field records.
 
         that.get_table_id_by_name(table_name, (err, table_id) => {
             if (err) {
                 callback(err);
             } else {
-                console.log("table_id", table_id);
-
-                // then we lookup the fields for that table by id.
-
-                // get the table fields.
-                //  Thought I'd done that.
-
-                // Get the field records.
-
                 //var akp = [table_fields_id, table_id];
                 let buf = Model_Database.encode_key(table_fields_kp, [table_id]);
-                //console.log('buf', buf);
 
                 that.get_records_by_key_prefix(buf, (err, fields_records) => {
                     if (err) {
@@ -1384,7 +1528,6 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
                 callback(err);
             } else {
                 //console.log('fields_records', fields_records);
-
                 //let res_keys = [];
                 //let res_values = [];
                 //let res = [res_keys, res_values];
@@ -1423,7 +1566,6 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
     get_table_names(callback) {
         // Does not use the model.
         // Queries the tables table
-
         // Think the Table_Table has kp of 2.
 
         this.get_records_by_key_prefix(2, (err, res_records) => {
@@ -1433,7 +1575,6 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
                 //console.log("res_records", res_records);
                 let res = res_records.map(x => x[1][0]);
                 callback(null, res);
-
             }
         });
 
@@ -1552,20 +1693,6 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
 
                                         if (record[1].length === 1) {
                                             let index_value_field_ids = record[1];
-                                            // there could be multiple fields that get referred to by the index values.
-
-                                            // I think that could be how bittrex-markets gets arranged.
-
-                                            // For the moment, need to encode the data like it would get used in the index.
-
-                                            //console.log("table_id", table_id);
-                                            //console.log("table_index_id", table_index_id);
-                                            //console.log("index_field_id", index_field_id);
-
-                                            // create an array of values that correspond with the array of index field values
-
-                                            // get the field from the arr_record
-                                            //
                                             let val = arr_record[index_field_id - size_diff];
                                             //console.log("val", val);
 
@@ -1603,45 +1730,12 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
                                             );
                                             arr_buf_index_lookup_keys.push(encoded_index_key);
                                             console.log('encoded_index_key', encoded_index_key);
-
-                                            // Could previously look up all of the index keys for the records.
-
-
-                                            // Functions to ensure necessary structures, based on live data, will be a bit tricky.
-                                            //  
-
-
-
-
-
-
-                                            // means there are 2 or more PK values that get pointed to.
-
-
-
-
-
                                             //throw "NYI";
                                         }
 
                                         // then need to construct the index keys using this.
                                         //
                                     });
-
-                                    //console.log('index_values', index_values);
-
-                                    // Then need to put together an index lookup query with those values.
-                                    //  The index kp, then the index id, then the value
-
-                                    //console.log("arr_record", arr_record);
-                                    //console.log('arr_buf_index_lookup_keys', arr_buf_index_lookup_keys);
-
-                                    // Then do a function that does multi-lookup on these keys
-                                    //  finds whichever they correspond to.
-
-                                    // for the moment, call the separate functions to lookup those buffers.
-
-                                    // ll get keys beginning
                                     var fns = Fns();
                                     each(arr_buf_index_lookup_keys, buf_key => {
                                         fns.push([that, that.ll_get_keys_beginning, [buf_key]]);
@@ -1680,33 +1774,9 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
                                             } else {
                                                 callback(null, false);
                                             }
-
-                                            // then we can decode each of these keys.
-                                            //  Should know we have searched by 1 value???
-                                            //let decoded = Model_Database.decode_keys(res_all);
-
-                                            // get all the table's index records
-                                            //that.ll_
-
-                                            /*
-
-                    that.get_table_index_keys(table_name, (err, res_keys) => {
-
-
-                      console.log('res_keys', res_keys);
-                      each(res_keys, item => {
-                        //Model_Database.encode_index_key()
-                      })
-                    });
-
-                    */
-
-                                            //throw "stop";
                                         }
                                     });
-
                                     //this.ll_get_keys_beginning();
-
                                     //let index_record =
                                 }
                             }
@@ -1743,7 +1813,7 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
 
                 let arr_query = [INSERT_TABLE_RECORD, table_id, arr_record];
 
-                console.log("table_id", table_id);
+                //console.log("table_id", table_id);
 
                 // Then should have a convenient way for doing / encoding that kind of query.
 
@@ -1757,13 +1827,13 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
                     arr_query[0]
                 );
 
-                console.log("buf_query", buf_query);
+                //console.log("buf_query", buf_query);
 
                 that.send_binary_message(buf_query, (err, res_query) => {
                     if (err) {
                         callback(err);
                     } else {
-                        console.log("res_query", res_query);
+                        //console.log("res_query", res_query);
                         //throw "stop";
 
                         // Need to decode the res_query
@@ -1830,17 +1900,49 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
     // Will probably use these records more for the actual lookups.
     //  They are in a very concise form, so need to take care in interpreting them.
 
+    get_native_types_records(callback) {
+        this.get_table_id_by_name('native types', (err, table_id) => {
+            if (err) {
+                callback(err);
+            } else {
+                // Then get the map fields for that table.
+                that.get_table_records(table_id, callback);
+            }
+        });
+    }
+
+    get_native_types_info(callback) {
+        this.get_native_types_records((err, records) => {
+            if (err) {
+                callback(err);
+            } else {
+                console.log('records', records);
+                throw 'stop';
+
+            }
+        })
+    }
+
+    get_native_types_map_info(callback) {
+        this.get_native_types_info((err, info) => {
+            if (err) {
+                callback(err);
+            } else {
+                console.log('info', info);
+
+            }
+        })
+    }
+
+
+
+
     // get_table_indexes_table_records
     get_table_indexes_records(table_name, callback) {
         const that = this;
 
         //let table_indexes_id = 3;
         let table_indexes_kp = TABLE_INDEXES_TABLE_ID * 2 + 2;
-        //let that = this;
-
-        // Get the fields map for the table.
-
-        //that.get_map_table_field_names_by_id();
 
         that.get_table_id_by_name(table_name, (err, table_id) => {
             if (err) {
@@ -1873,7 +1975,6 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
         //  look up the indexes table.
 
         // Should refer to the map of field names for the table
-
         // TABLE_FIELDS_TABLE_ID
 
         const that = this;
@@ -1927,26 +2028,12 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
                                             throw "NYI";
                                         }
                                     });
-
-                                    //console.log('res', res);
-
                                     callback(null, res);
-
-                                    // Want to also be able to get an index to lookup based on some values from a record.
-                                    //  Will do this when looking to see if a record should be overwritten or not.
-
-                                    // This is useful information to be able to
-
-                                    // [table_id, index_id (within table), field id] [primary key id or ids]
-                                    //
-
-                                    // Could look up the field names.
                                 }
                             });
                         }
                     }
                 );
-
                 // Then [kp4, table_id]
 
                 // Construct the key
@@ -2014,25 +2101,6 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
         }
     }
 
-    // get all tables, then get the counts and index counts for all of them
-
-    // all_tables_records_and_index_records_counts
-    //  could also do this while iterating through all keys.
-
-    // Then need to narrow down on available times / timestamps
-
-    // The encoded data in the buffers is relatively efficient.
-    //  Would take a bit more work on the server to have a model that can efficiently do some index lookups.
-
-    // The full A&A has a fair bit of complexity.
-    //  Allows for actions to be defined and assigned to users and their groups
-
-    // Would be worth integrating authentication authentication into the db sooner rather than later.
-    //  Also, users, groups, user groups, permission consumer (maybe just an id), permission based actions, permission based action consumers
-    //   roles, user roles
-    //    being like groups?
-    //  auth tokens
-
     // There is quite a lot of complexity in securing the database and allowing granular permission setting.
 
     // For the moment, exporting data seems most important.
@@ -2086,11 +2154,6 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
 
                 }
             });
-
-
-
-            //throw 'Expected this.model, otherwise can\'t find table by name'
-            //callback("Expected this.model, otherwise can't find table by name");
         }
     }
 
@@ -2119,8 +2182,6 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
                 }
             });
 
-
-
             //throw 'Expected this.model, otherwise can\'t find table by name'
             //callback("Expected this.model, otherwise can't find table by name");
         }
@@ -2148,21 +2209,21 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
         }
     }
 
-    // Could do a count with a limit as well.
-
-
-
     count_each_table_records(callback) {
         //console.log('count_each_table_records');
         this.get_table_names((err, table_names) => {
-            if (err) { callback(err); } else {
+            if (err) {
+                callback(err);
+            } else {
                 //console.log('table_names', table_names);
                 let fns = Fns();
                 each(table_names, table_name => {
                     fns.push([this, this.count_table_records, [table_name]]);
                 })
                 fns.go((err, res_all) => {
-                    if (err) { callback(err); } else {
+                    if (err) {
+                        callback(err);
+                    } else {
                         //console.log('res_all', res_all);
                         let res = [];
 
@@ -2179,14 +2240,18 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
     count_each_table_records_up_to(limit, callback) {
         //console.log('count_each_table_records');
         this.get_table_names((err, table_names) => {
-            if (err) { callback(err); } else {
+            if (err) {
+                callback(err);
+            } else {
                 //console.log('table_names', table_names);
                 let fns = Fns();
                 each(table_names, table_name => {
                     fns.push([this, this.count_table_records_up_to, [table_name, limit]]);
                 })
                 fns.go((err, res_all) => {
-                    if (err) { callback(err); } else {
+                    if (err) {
+                        callback(err);
+                    } else {
                         //console.log('res_all', res_all);
                         let res = [];
 
@@ -2199,6 +2264,15 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
             }
         })
     }
+
+
+    // Also want an index lookup function.
+    //  Give it an indexed value in a table, get the pk back
+    //   or get the record back
+
+    // Table summaries with index record counts and field info would help too.
+
+
 
     // ll_count_keys_in_range_up_to
 
@@ -2304,6 +2378,46 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
         }
     }
 
+
+    get_table_record(table_name, arr_key, callback) {
+        this.get_table_kp_by_name(table_name, (err, kp) => {
+            if (err) {
+                callback(err);
+            } else {
+                let buf_key = Model_Database.encode_key(kp, arr_key);
+                this.ll_get_record(buf_key, (err, ll_res) => {
+                    if (err) {
+                        callback(err);
+                    } else {
+                        //console.log('get_table_record ll_res', ll_res);
+                        //throw 'stop';
+                        //let decoded = Model_Database.decode_model_row(ll_res);
+
+                        // No, the keys got decoded wrong.
+                        let num_xas2_prefixes = 0;
+
+                        // Seems like the key was encoded wrong somehow.
+                        //  Record should be a key value pair.
+
+
+                        let arr_bufs_kv = Binary_Encoding.split_length_item_encoded_buffer_to_kv(ll_res);
+                        //console.log('arr_bufs_kv', arr_bufs_kv);
+
+                        // then decode that kv pair
+
+                        // And remove the table id from it too?
+                        //  Makes sense as we are dealing with the record within the table.
+                        let remove_kp = true;
+                        let arr_decoded = Model_Database.decode_model_row(arr_bufs_kv[0], remove_kp);
+                        //console.log('arr_decoded', arr_decoded);
+                        //throw 'stop';
+                        callback(null, arr_decoded);
+                    }
+                })
+            }
+        })
+    }
+
     // get table index records
     //  (all of them)
 
@@ -2312,10 +2426,6 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
             var pos = 0,
                 i_num,
                 i_sub_evt_type;
-            //console.log('xas2.read', xas2.read);
-            //console.log('xas2', xas2);
-            //console.log('xas2.read', typeof xas2.read);
-            //console.log('ll_subscription_event', ll_subscription_event);
 
             [i_num, pos] = xas2.read(ll_subscription_event, pos);
             [i_sub_evt_type, pos] = xas2.read(ll_subscription_event, pos);
@@ -2750,6 +2860,49 @@ if (require.main === module) {
                     throw err;
                 } else {
                     console.log('res_count', res_count);
+
+                    // limited version
+
+                    lc.get_table_records_up_to('bittrex markets', 10, (err, records) => {
+                        if (err) {
+                            console.trace();
+                            throw err;
+                        } else {
+                            console.log('bittrex markets');
+                            console.log('records', records);
+
+                            // get the field items as 
+
+                            lc.get_table_fields_records('bittrex markets', (err, table_fields_records) => {
+                                if (err) {
+                                    throw err;
+                                } else {
+                                    console.log('table_fields_records', table_fields_records);
+
+
+                                    // get_table_fields_info
+
+                                    lc.get_table_fields_info('bittrex markets', (err, table_fields_info) => {
+                                        if (err) {
+                                            throw err;
+                                        } else {
+                                            console.log('table_fields_info', table_fields_info);
+
+
+                                            // get_table_fields_info
+
+
+
+                                        }
+                                    });
+
+
+
+                                }
+                            });
+                        }
+                    })
+
                 }
             })
 
