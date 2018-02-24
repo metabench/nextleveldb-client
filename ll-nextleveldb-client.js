@@ -39,8 +39,18 @@ const LL_GET_RECORD = 7;
 //const LL_COUNT_GET_FIRST_LAST_KEYS_IN_RANGE = 7;
 const LL_COUNT_KEYS_IN_RANGE_UP_TO = 8;
 const LL_GET_RECORDS_IN_RANGE_UP_TO = 9;
+
 const INSERT_TABLE_RECORD = 12;
+
+
 const INSERT_RECORDS = 13;
+
+// This could also ensure multiple tables.
+//  It could see if it's given a single table or an array of tables.
+const ENSURE_TABLE = 16;
+
+
+
 const LL_WIPE = 20;
 const LL_WIPE_REPLACE = 21;
 const LL_SUBSCRIBE_ALL = 60;
@@ -233,7 +243,6 @@ class LL_NextLevelDB_Client extends Evented_Class {
 
                 });
                 connection.on('message', function (message) {
-                    //console.log('message', message);
                     if (message.type === 'utf8') {
                         var obj_message = JSON.parse(message.utf8Data);
 
@@ -258,8 +267,6 @@ class LL_NextLevelDB_Client extends Evented_Class {
                             }
                         }
                     }
-                    // binary messages.
-
                     if (message.type === 'binary') {
                         that.receive_binary_message(message.binaryData);
                     }
@@ -322,18 +329,12 @@ class LL_NextLevelDB_Client extends Evented_Class {
      * @memberof LL_NextLevelDB_Client
      */
     receive_binary_message(buf_message) {
-        // decode the first byte...
         var message_id, pos = 0;
-        //console.log('buf_message', buf_message);
         [message_id, pos] = xas2.read(buf_message, pos);
-        //console.log('message_id', message_id);
-
-        // then the rest of the message
         var buf_the_rest = Buffer.alloc(buf_message.length - pos);
         buf_message.copy(buf_the_rest, 0, pos);
         this.ws_response_handlers[message_id](buf_the_rest);
     }
-    // with callback!
 
     /**
      * 
@@ -363,16 +364,13 @@ class LL_NextLevelDB_Client extends Evented_Class {
     send_binary_subscription_message(message, subscription_event_callback) {
         var idx = this.id_ws_req++,
             ws_response_handlers = this.ws_response_handlers;
-
         var buf_2 = Buffer.concat([xas2(idx).buffer, message]);
         var that = this;
 
         ws_response_handlers[idx] = function (obj_message) {
             subscription_event_callback(obj_message);
         };
-
         // Should be able to unsubscribe
-
         var unsubscribe = () => {
             // Send unsubscribe with the idx to the server.
             // LL_UNSUBSCRIBE_SUBSCRIPTION
@@ -384,14 +382,8 @@ class LL_NextLevelDB_Client extends Evented_Class {
         }
         //console.log('pre send', buf_2);
         this.websocket_connection.sendBytes(buf_2);
-
         return unsubscribe;
-
     }
-
-    //ll_get_table_records_by_kp(table_key_prefix, callback) {
-
-    //}
 
     /**
      * 
@@ -822,6 +814,33 @@ class LL_NextLevelDB_Client extends Evented_Class {
 
         });
         return unsubscribe;
+
+    }
+
+    'ensure_table' (arr_table, callback) {
+        // arr_table could be multiple tables.
+
+        let buf_encoded_table = Binary_Encoding.flexi_encode_item(arr_table);
+        var buf_query = Buffer.concat([xas2(ENSURE_TABLE).buffer, buf_encoded_table]);
+
+        //console.log('buf_query', buf_query);
+        //console.log('buf_query.length', buf_query.length);
+
+        this.send_binary_message(buf_query, (err, res_binary_message) => {
+            if (err) {
+                callback(err);
+            } else {
+                let decoded = Binary_Encoding.decode(res_binary_message);
+                //console.log('decoded', decoded);
+
+                callback(null, decoded);
+
+                //callback(null, true);
+                // Don't know if it would be useful to get back the ids.
+            }
+        });
+
+
 
     }
 

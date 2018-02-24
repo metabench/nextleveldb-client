@@ -8,7 +8,8 @@ const lang = require("lang-mini");
 let each = lang.each,
     tof = lang.tof,
     Fns = lang.Fns,
-    clone = lang.clone;
+    clone = lang.clone,
+    get_item_sig = lang.get_item_sig;
 
 const mapify = lang.mapify;
 
@@ -57,9 +58,6 @@ const INSERT_TABLE_RECORD = 12;
 //  Then we do index lookups on the fields to see if it's already in the table
 //   Not using a local model, downloads the index field data and decodes it. ???
 //   Model is specifically designed to encode / decode index and field data and connect it to definitions.
-
-
-
 
 // Maybe it would be possible to obtain part of the model from the server and use that?
 
@@ -231,6 +229,22 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
                 //console.log('buf_core', buf_core);
                 that.model = Model_Database.load(buf_core);
                 callback(null, that.model);
+            }
+        });
+    }
+
+    // Useful for when we change a model, and then compare the changed one with the original.
+    load_2_core(callback) {
+        //var that = this;
+        this.get_core((err, buf_core) => {
+            if (err) {
+                callback(err);
+            } else {
+                //console.log('buf_core', buf_core);
+                let res = [Model_Database.load(buf_core), Model_Database.load(buf_core)];
+
+
+                callback(null, res);
             }
         });
     }
@@ -1143,6 +1157,84 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
         });
     }
 
+    // [name, arr_table_def]
+
+    // Could just encode it and pass it to the server in a query.
+
+    /*
+
+    ensure_table(table, callback) {
+
+        // There will be some kind of table definition object.
+
+        let t_table = tof(table);
+        console.log('table', table);
+        // Could use the definitions already made elsewhere.
+
+        let t_sig = get_item_sig(table);
+        console.log(t_sig, t_sig);
+
+        // May need some lower level functionality in the DB to create a table.
+        //  Don't want to have to use the Model on the client-side.
+
+        // Use of the Server-side Model should be fine.
+        //  Get that server-side Model to come up with the new DB rows.
+
+        // Would need to create a bunch of new rows for things such as incrementors.
+
+        // ensure_table seems like a decent step to take during setup.
+        //  then can ensure a variety of records.
+
+        // Check that the params are OK, then call the lower level ensure table function.
+
+
+        //throw 'stop';
+
+
+        if (t_table === 'array') {
+            // is it length 2, containing 2 other arrays?
+
+            if (table.length === 2) {
+
+                // Get the current model.
+                //  (do that twice?)
+
+                // get current model twice.
+
+                // diff the changed one with the original one.
+
+
+
+                // Maybe better facilities to clone a Model.
+
+                this.load_2_core((err, models) => {
+                    if (err) {
+                        callback(err);
+                    } else {
+                        let [m1, m2] = models;
+                        m2.ensure_table(table);
+                        let changes = m1.diff(m2);
+                        console.log('changes', changes);
+
+                    }
+
+
+                })
+
+
+
+
+
+            } else {
+
+
+            }
+        }
+
+    }
+
+    */
+
     // tables 2, native types 4, fields 6, indexes 8
 
     // Also want to get an array of the field names
@@ -1181,8 +1273,6 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
         });
     }
 
-    // then a version to get it by table id.
-
     get_table_field_names_by_table_id(table_id, callback) {
         // Should know the table fields id already.
         const that = this;
@@ -1201,11 +1291,7 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
         });
     }
 
-    // get_table_field_names
-
     get_table_field_names(table_name, callback) {
-        // Should know the table fields id already.
-
         const that = this;
         const table_fields_kp = TABLE_FIELDS_TABLE_ID * 2 + 2;
         that.get_table_id_by_name(table_name, (err, table_id) => {
@@ -1299,12 +1385,8 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
     // get_table_kv_field_names
 
     get_table_kv_field_names(table_name, callback) {
-        // look up the table id
         const that = this;
-
         const table_fields_kp = TABLE_FIELDS_TABLE_ID * 2 + 2;
-        // Get the field records.
-
         that.get_table_id_by_name(table_name, (err, table_id) => {
             if (err) {
                 callback(err);
@@ -1417,18 +1499,6 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
     //  Where possible, the simpler operations should avoid using the Model, and instead operate on a lower level.
 
     check_table_record_index_lookup(table_name, arr_record, callback) {
-        // Check to see if the record can be found according to the indexes in the table.
-
-        // This record maybe lacks the ID field.
-        //
-
-        // Compare the record with the number of fields the table has.
-        //  May want to get the number of PK fields as well.
-        //  Could give the record in a format that says its missing its PK?
-
-        // Want the array of field names too / KV fields
-        //  Or to count the missing fields...
-
         const that = this;
         let table_indexes_kp = TABLE_INDEXES_TABLE_ID * 2 + 2;
 
@@ -1481,14 +1551,6 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
                                         if (record[1].length === 1) {
                                             let index_value_field_ids = record[1];
                                             let val = arr_record[index_field_id - size_diff];
-                                            //console.log("val", val);
-
-                                            //index_values.push(val);
-
-                                            // We do want it to return the record id if it finds it.
-
-                                            // these two values can be used for that index lookup.
-
                                             let encoded_index_key = Model_Database.encode_index_key(
                                                 table_id * 2 + 3,
                                                 table_index_id, [val]
@@ -2024,7 +2086,6 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
         }
     }
 
-
     get_table_record(table_name, arr_key, callback) {
         this.get_table_kp_by_name(table_name, (err, kp) => {
             if (err) {
@@ -2152,7 +2213,6 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
         );
         return unsubscribe;
     }
-
     // a version that removes the table kp from the records...
 
     subscribe_table_puts(table_name, subscription_event_handler, remove_kp = true) {
@@ -2434,7 +2494,6 @@ var new_backup_path = (name, callback) => {
 NextlevelDB_Client.new_backup_path = new_backup_path;
 NextlevelDB_Client.last_backup_path = last_backup_path;
 
-
 // count_each_table_records
 
 
@@ -2529,9 +2588,7 @@ if (require.main === module) {
 
         }
     });
-
     var all_data = [];
-
 } else {
     //console.log('required as a module');
 }
