@@ -2096,7 +2096,7 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
                     if (err) {
                         callback(err);
                     } else {
-                        let num_xas2_prefixes = 0;
+                        //let num_xas2_prefixes = 0;
                         let arr_bufs_kv = Binary_Encoding.split_length_item_encoded_buffer_to_kv(ll_res);
                         let remove_kp = true;
                         let arr_decoded = Model_Database.decode_model_row(arr_bufs_kv[0], remove_kp);
@@ -2516,7 +2516,7 @@ var local_xeon = {
 
 
 if (require.main === module) {
-    var lc = new NextlevelDB_Client(local_xeon);
+    var lc = new NextlevelDB_Client(local_info);
 
     // Looks like the level client keeps itself open.
     //  console.log('pre start');
@@ -2525,7 +2525,6 @@ if (require.main === module) {
         if (err) {
             throw err;
         } else {
-
             // count_each_table_records_up_to
             // count_each_table_records
 
