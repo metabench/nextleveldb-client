@@ -277,7 +277,7 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
 
                 // The get_table_records function won't have the id within the key.
                 //table.add_records(table_records, true);
-                throw "stop";
+                //throw "stop";
                 table.add_records(table_records);
                 // It should index them.
                 //  Add them to the index too?
@@ -710,6 +710,7 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
 
     //
 
+    /*
     get_table_records_by_key_beginning(table_name, key_beginning, callback) {
 
         this.get_table_kp_by_name(table_name, (err, kp) => {
@@ -758,6 +759,11 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
             }
         })
     }
+    */
+
+    // Build docoding into ll_get_records_by_key_prefix
+    //  Decoding will be managed on a lower level, as we are able to do so, based on more information being in the messages, and this can be used to decode the messages as they arrive.
+
 
 
     get_records_by_key_prefix(key_prefix, callback) {
@@ -798,11 +804,30 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
     }
 
 
+
+    // A paged version of this would be useful.
+    //  May give it a paging option as its middle parameter.
+
+    // Then it will call get_records_by_key_prefix with paging.
+
+    // A lower level test for get_records_by_key_prefix would be useful.
+
+
+
+
+
+
+
     /**
      * @param {any} table_name
      * @param {any} callback
      * @memberof NextlevelDB_Client
      */
+
+    // Could have lower level functions that get the table's records, sending the table name over to the server.
+    //  More complex server-side functionality will allow yet more complex and useful queies to take place server-side.
+    //  
+
     get_table_records(table_name, callback) {
         if (this.model) {
             var table = this.model.map_tables[table_name];
@@ -814,15 +839,13 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
             }
         } else {
             //throw 'Expected this.model, otherwise can\'t find table by name'
-
             this.get_table_kp_by_name(table_name, (err, kp) => {
                 if (err) {
                     callback(err);
                 } else {
                     this.get_records_by_key_prefix(kp, callback);
                 }
-            })
-
+            });
             //callback("Expected this.model, otherwise can't find table by name");
         }
     }
@@ -1112,7 +1135,15 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
      * @param {any} callback
      * @memberof NextlevelDB_Client
      */
+
+    // Maybe this will be retired because the ll version has got more advanced.
+    //  It knows the response contains encoded keys, so it will be able to dcode automatically,
+
+    /*
+
     get_keys_by_key_prefix(key_prefix, callback) {
+
+
         this.ll_get_keys_by_key_prefix(key_prefix, (err, ll_res) => {
             if (err) {
                 callback(err);
@@ -1123,8 +1154,44 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
             }
         });
     }
+    */
 
+    // Will make a lower level version of this.
+
+
+    /*
     get_table_id_by_name(table_name, callback) {
+
+        // This will be moved to become a lower level server operation.
+        //  Doing that in part because other server functions will need to make use of this.
+
+        // Also, want to make more general purpose index lookup functionality within the server.
+
+        // This is an index lookup on the tables table
+
+        // An index lookup function would be well suited as a lower level piece of functionality
+        //  Looks up the ID of the object.
+
+        // Other index lookups could get the record.
+
+        // get_table_id_by_name
+        // idx_id_lookup
+        // table_idx_id_lookup
+
+        // With this, we need to know which index we are referring to.
+
+        // Bringing index lookups and other indexing functionality deeper into the server db makes a lot of sense.
+
+
+
+
+
+
+
+        // idx_lookup(tables_table_idx_kp (3), 0, [table_name])
+
+
+
         // need to refer to the index of tables
 
         const tables_table_id = 0;
@@ -1135,23 +1202,63 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
             tables_table_idx_kp,
             idx_id, [table_name]
         );
-        this.get_keys_by_key_prefix(buf_key_beginning, (err, keys_beginning) => {
+
+
+        // Keys by key prefix, expecting possibly multiple keys
+        //  Don't want paging for this.
+
+        // Should only get one key back when looking up table name.
+
+        // this.table_index_value_lookup
+
+        //  can get the numbered field, could make it get the named field too.
+
+
+
+        //this.table_index_lookup(tables_table_id, idx_id, [table_name]);
+
+
+
+        // table_index_value_lookup
+        //  would be a nice function to have on the server, then to make available through the ll api.
+
+
+
+
+        // This more generic function would be a way to lower the amount of code needed for a variety of cases
+        //this.table_index_value_lookup(tables_table_id, idx_id, [table_name], 3, callback);
+        //  or maybe like this.table_index_value_lookup(tables_table_id, idx_id, [table_name], 'name', callback), where a string is used for the field, rather than an int index within the index.
+
+
+
+        this.ll_get_keys_by_key_prefix(buf_key_beginning, (err, keys_beginning) => {
             if (err) {
                 callback(err);
             } else {
                 var key_beginning = keys_beginning[0];
                 //console.log('key_beginning', key_beginning);
+
+                console.log('table_name', table_name);
                 var table_id = key_beginning[3];
                 callback(null, table_id);
             }
         });
+
+
     }
+    */
 
     get_table_kp_by_name(table_name, callback) {
+        console.log('get_table_kp_by_name table_name', table_name);
         this.get_table_id_by_name(table_name, (err, id) => {
             if (err) {
                 callback(err);
             } else {
+                // 
+
+                console.log('');
+                console.log('***id', id);
+                console.log('');
                 callback(null, id * 2 + 2);
             }
         });
@@ -1391,6 +1498,9 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
             if (err) {
                 callback(err);
             } else {
+
+                console.log('table_id', table_id);
+
                 //var akp = [table_fields_id, table_id];
                 let buf = Model_Database.encode_key(table_fields_kp, [table_id]);
 
@@ -2096,15 +2206,58 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
                     if (err) {
                         callback(err);
                     } else {
+
+                        if (ll_res && ll_res.length > 0) {
+                            let arr_bufs_kv = Binary_Encoding.split_length_item_encoded_buffer_to_kv(ll_res);
+                            let remove_kp = true;
+                            let arr_decoded = Model_Database.decode_model_row(arr_bufs_kv[0], remove_kp);
+                            callback(null, arr_decoded);
+                        } else {
+                            callback(null, undefined);
+                        }
+
                         //let num_xas2_prefixes = 0;
-                        let arr_bufs_kv = Binary_Encoding.split_length_item_encoded_buffer_to_kv(ll_res);
-                        let remove_kp = true;
-                        let arr_decoded = Model_Database.decode_model_row(arr_bufs_kv[0], remove_kp);
-                        callback(null, arr_decoded);
+
                     }
                 })
             }
         })
+    }
+
+    put_model_record(model_record, callback) {
+        let bufs = model_record.to_arr_buffer_with_indexes();
+        //let buf = model_record.to_buffer_with_indexes();
+
+        console.log('bufs', bufs);
+        //console.log('model_record', model_record);
+
+        function flatten(arr) {
+            return arr.reduce(function (flat, toFlatten) {
+                return flat.concat(Array.isArray(toFlatten) ? flatten(toFlatten) : toFlatten);
+            }, []);
+        }
+
+
+        //let row_buffers = Binary_Encoding.get_row_buffers(buf);
+        //console.log('row_buffers', row_buffers);
+        // Decode that buffer?
+        //console.log('bufs', bufs);
+
+        //let buf2 = Buffer.concat(flatten(bufs));
+        //console.log('buf2', buf2);
+        //console.log('buf2.length', buf2.length);
+
+        // Think we need to encode these differently.
+        let buf3 = Model_Database.encode_model_rows(bufs);
+
+        //console.log('buf3', buf3);
+        //console.log('buf2.length', buf2.length);
+        //console.log('buf3.length', buf3.length);
+
+
+        //throw 'stop';
+
+        this.ll_put_records_buffer(buf3, callback);
     }
 
     // get table index records

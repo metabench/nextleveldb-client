@@ -2,29 +2,36 @@
  * Created by James on 15/10/2016.
  */
 
-var http = require('http');
-var url = require('url');
-var WebSocketClient = require('websocket').client;
-var jsgui = require('lang-mini');
-var Evented_Class = jsgui.Evented_Class;
-var Fns = jsgui.Fns;
-var is_array = jsgui.is_array;
-var each = jsgui.each;
-var xas2;
-//var encodings = require('../nextleveldb-server/encodings/encodings');
-var x = xas2 = require('xas2');
+const http = require('http');
+const url = require('url');
+const WebSocketClient = require('websocket').client;
+const lang = require('lang-mini');
+const get_item_sig = lang.get_item_sig;
+const get_arr_sig = lang.get_arr_sig;
 
-var Binary_Encoding = require('binary-encoding');
-var Binary_Encoding_Record = Binary_Encoding.Record;
+const Evented_Class = lang.Evented_Class;
+const Fns = lang.Fns;
+const is_array = lang.is_array;
+const each = lang.each;
+const get_a_sig = lang.get_a_sig;
+const tof = lang.tof;
+//const xas2;
+//var encodings = require('../nextleveldb-server/encodings/encodings');
+const x = xas2 = require('xas2');
+
+const Binary_Encoding = require('binary-encoding');
+const Binary_Encoding_Record = Binary_Encoding.Record;
 
 const Model = require("nextleveldb-model");
 const Model_Database = Model.Database;
 
 //console.log('encodings.poloniex.market', encodings.poloniex.market);
-var Paging = Model.Paging;
-var fs = require('fs');
-var request = require('request');
-var protocol = 'http://';
+const Paging = Model.Paging;
+const fs = require('fs');
+const request = require('request');
+const protocol = 'http://';
+
+const path = require('path');
 
 const LL_COUNT_RECORDS = 0;
 const LL_PUT_RECORDS = 1;
@@ -41,9 +48,15 @@ const LL_FIND_COUNT_TABLE_RECORDS_INDEX_MATCH = 11;
 const INSERT_TABLE_RECORD = 12;
 const INSERT_RECORDS = 13;
 const ENSURE_TABLE = 20;
+const ENSURE_TABLES = 21;
+const TABLE_EXISTS = 22;
+const TABLE_ID_BY_NAME = 23;
+// RENAME_TABLE
+const GET_TABLE_FIELDS_INFO = 24;
 const LL_SUBSCRIBE_ALL = 60;
 const LL_SUBSCRIBE_KEY_PREFIX_PUTS = 61;
 const LL_UNSUBSCRIBE_SUBSCRIPTION = 62;
+
 const LL_WIPE = 100;
 const LL_WIPE_REPLACE = 101;
 
@@ -79,6 +92,8 @@ const ARRAY = 10;
 
 const return_message_type = true;
 
+
+
 const BINARY_PAGING_NONE = 0;
 const BINARY_PAGING_FLOW = 1;
 const BINARY_PAGING_LAST = 2;
@@ -86,6 +101,48 @@ const BINARY_PAGING_LAST = 2;
 const RECORD_PAGING_NONE = 3;
 const RECORD_PAGING_FLOW = 4;
 const RECORD_PAGING_LAST = 5;
+const RECORD_UNDEFINED = 6;
+
+// A whole message type for undefined record?
+
+const KEY_PAGING_NONE = 7;
+const KEY_PAGING_FLOW = 8;
+const KEY_PAGING_LAST = 9;
+
+// Simplest error message.
+//  Could have a number, then could have encoded text.
+//  
+const ERROR_MESSAGE = 10;
+
+
+
+
+// Is going to have much more advanced client<>server functionality, with much more advanced server-side functionality too.
+//  Will be able to upload a binary encoded array of table definitions for it to ensure, and it will do that.
+//   It is going to use a Model on the server side to translate these definitions within the commands for the appropriate rows / row updates in the database.
+//    Should be able to use a model diff to see which rows have changed, and then put them into the database.
+//     Would need to be careful about updating indexes too.
+//      That could be done with a full model of the core.
+//    Some lower level diff processing in the db, or batching put and delete changes together into one operation.
+
+// The size of the protocol is changing, meaning more complex objects can be got from the DB, but the underlying record structure is staying the same.
+//  The protocol will handle different paging systems, enabling convenient use of the Observable pattern in JavaScript.#
+
+
+// Need some more server-side functionality to do with adding a binary encoded table struture (list) to the database.
+//  This could use Binary Paging as an option. Not dealing with records in particular? Or if it's Record Paging, could return the records that are added / changed / deleted.
+//   More flexibility in the binary paging systems to add encoding for deleted records.
+
+
+
+
+
+
+
+
+
+
+
 
 
 /**
@@ -152,7 +209,7 @@ class LL_NextLevelDB_Client extends Evented_Class {
             maxReceivedMessageSize: 512000000,
             fragmentOutgoingMessages: false,
             //assembleFragments: false,
-            closeTimeout: 10000
+            closeTimeout: 1000000
         });
 
         client.on('connectFailed', function (error) {
@@ -231,6 +288,8 @@ class LL_NextLevelDB_Client extends Evented_Class {
                     console.log('echo-protocol Connection Closed');
                     // At this point its worth noticing the connection has been closed.
                     // When the connection is closed, don't try to send.
+
+
                     that.connected = false;
                     attempting_reconnection = false;
                     first_connect = false;
@@ -352,7 +411,7 @@ class LL_NextLevelDB_Client extends Evented_Class {
             message_type;
         [message_id, pos] = xas2.read(buf_message, pos);
 
-        //console.log('message_id', message_id);
+        //console.log('1) message_id', message_id);
 
         var buf_the_rest = Buffer.alloc(buf_message.length - pos);
         buf_message.copy(buf_the_rest, 0, pos);
@@ -363,7 +422,7 @@ class LL_NextLevelDB_Client extends Evented_Class {
 
         }
         //console.log('message_type', message_type);
-
+        //console.log('return_message_type', return_message_type);
 
         if (return_message_type) {
             //console.log('buf_the_rest', buf_the_rest);
@@ -386,13 +445,21 @@ class LL_NextLevelDB_Client extends Evented_Class {
             }
 
             if (message_type === RECORD_PAGING_NONE) {
-
                 // Could even strip the paging / structure flag here.
-
+                //console.log('2) message_id', message_id);
                 this.ws_response_handlers[message_id](buf_the_rest);
                 // could remove the response handler here
                 this.ws_response_handlers[message_id] = null;
             }
+            if (message_type === RECORD_UNDEFINED) {
+                //let buf_null = Binary_Encoding.flexi_encode_item(undefined);
+
+                console.log('buf_the_rest', buf_the_rest);
+                this.ws_response_handlers[message_id](buf_the_rest);
+                // could remove the response handler here
+                this.ws_response_handlers[message_id] = null;
+            }
+
             if (message_type === RECORD_PAGING_FLOW) {
                 this.ws_response_handlers[message_id](buf_the_rest);
                 // could remove the response handler here
@@ -402,6 +469,34 @@ class LL_NextLevelDB_Client extends Evented_Class {
                 // could remove the response handler here
                 this.ws_response_handlers[message_id] = null;
             }
+
+
+
+
+
+            if (message_type === KEY_PAGING_NONE) {
+                // Could even strip the paging / structure flag here.
+                console.log('2) message_id', message_id);
+                this.ws_response_handlers[message_id](buf_the_rest);
+                // could remove the response handler here
+                this.ws_response_handlers[message_id] = null;
+            }
+            if (message_type === KEY_PAGING_FLOW) {
+                this.ws_response_handlers[message_id](buf_the_rest);
+                // could remove the response handler here
+            }
+            if (message_type === KEY_PAGING_LAST) {
+                this.ws_response_handlers[message_id](buf_the_rest);
+                // could remove the response handler here
+                this.ws_response_handlers[message_id] = null;
+            }
+
+            if (message_type === ERROR_MESSAGE) {
+                console.log('client has received an error from the server');
+                this.ws_response_handlers[message_id](buf_the_rest);
+                this.ws_response_handlers[message_id] = null;
+            }
+
         } else {
             this.ws_response_handlers[message_id](buf_the_rest);
             this.ws_response_handlers[message_id] = null;
@@ -421,17 +516,35 @@ class LL_NextLevelDB_Client extends Evented_Class {
     //  That may mean we no longer need the 'll' versions of functions, but can have whether or not to decode as an option.
     //  Could reduce the codebase size that way by getting rid of the structure of a normal function that calls a ll function and decodes the results.
 
+    // Not so sure about enhancing this code further, as it's already fairly large and complex.
+    //  It's quite flexible.
+    // 
+
+
+    // send_binary_no_paging_message
+    //  That could be easier to use. Maybe it could even call send_binary_message, though that would be less optimal.
+
 
 
     send_binary_message(message, message_type = BINARY_PAGING_NONE, decode = false, callback) {
 
+        // Encoding the message into a buffer would be very useful.
+        //  
+
+
         let a = arguments;
 
-        console.log('a.length', a.length);
+        // Need to read what type of message it is when the message gets returned....
+
+        //console.log('a.length', a.length);
 
         if (a.length === 2) {
             callback = a[1];
             message_type = BINARY_PAGING_NONE;
+            decode = false;
+        }
+        if (a.length === 3) {
+            callback = a[2];
             decode = false;
         }
 
@@ -440,14 +553,8 @@ class LL_NextLevelDB_Client extends Evented_Class {
         //  Probably best to always use the streaming connection.
         let pos = 0,
             buf_the_rest, response_type_code;
-
-
         // Can choose the message type here.
         //  Try using some kind of es6 optional params.
-
-
-
-
         // Have a way of choosing the message / paging type here?
 
         var idx = this.id_ws_req++,
@@ -459,7 +566,8 @@ class LL_NextLevelDB_Client extends Evented_Class {
 
         // Would be helpful in many cases to have a paging info byte in the response.
 
-        console.log('idx', idx);
+        //console.log('idx', idx);
+
         //  Inefficient in some ways when we know it's not needed.
         //  Many functions can handle paging though, and I think it's quite a priority in terms of replication and having the dbs able to talk to each other.
 
@@ -483,39 +591,75 @@ class LL_NextLevelDB_Client extends Evented_Class {
             // Could have further code within Model that is an OO message request and response encoder and decoder.
             //  There will be a number of different options for encoding and decoding messages, and it gets a little longwinded all in liner if statement code.
 
-
+            //console.log('send_binary_message message_type', message_type);
 
             // The extra complexity here will mean that 'll' functions will be able to act as normal functions, so won't need to be called 'll', and the normal functions that 
             if (message_type === BINARY_PAGING_NONE) {
-
+                //console.log('decode', decode);
                 if (decode) {
                     ws_response_handlers[idx] = function (obj_message) {
+                        //console.log('obj_message', obj_message);
                         [response_type_code, pos] = xas2.read(obj_message, pos);
+
+
                         var buf_the_rest = Buffer.alloc(obj_message.length - pos);
                         obj_message.copy(buf_the_rest, 0, pos);
 
                         // decode this buffer, it's binary encoding.
+                        //console.log('response_type_code', response_type_code);
 
-                        let decoded = Binary_Encoding.decode(buf_the_rest);
-                        console.log('decoded', decoded);
+                        if (response_type_code === ERROR_MESSAGE) {
+                            //callback(buf_the_rest);
+                            throw 'NYI';
+                        } else {
 
-                        callback(null, decoded);
+                            // Change the encoding on the server, to say that any result is encoded as an xas2, and indicated that it's coded as xas2.
+                            //  That's because we decode the message of BINARY type, which here means we use Binary_Encoding
+
+
+
+
+                            //console.log('buf_the_rest', buf_the_rest);
+                            // 
+
+                            // Should prob get object 0
+                            //  And check elsewhere to make sure this works.
+
+                            let d1 = Binary_Encoding.decode_buffer(buf_the_rest);
+                            //console.log('d1', d1);
+
+                            let decoded = d1[0];
+                            //console.log('decoded', decoded);
+
+                            callback(null, decoded);
+                        }
                         ws_response_handlers[idx] = null;
                     };
                 } else {
+
                     ws_response_handlers[idx] = function (obj_message) {
                         [response_type_code, pos] = xas2.read(obj_message, pos);
                         //console.log('PAGING_NONE obj_message', obj_message);
+                        //console.log('response_type_code', response_type_code);
 
+
+                        // check to see if we get an error response.
                         let buf_the_rest = Buffer.alloc(obj_message.length - pos);
                         obj_message.copy(buf_the_rest, 0, pos);
+
+                        if (response_type_code === ERROR_MESSAGE) {
+                            callback(buf_the_rest);
+                        } else {
+                            callback(null, buf_the_rest);
+                        }
+
 
                         // Remove the paging info from it.
 
                         // Could look in the response to see what message we have, if it indicates paging.
                         //  However, it's a binary message
 
-                        callback(null, buf_the_rest);
+
                         ws_response_handlers[idx] = null;
                     };
                 }
@@ -562,7 +706,201 @@ class LL_NextLevelDB_Client extends Evented_Class {
                 // could remove the response handler here
             }
 
+            /*
+            if (message_type === ERROR_MESSAGE) {
+                console.log('we have an error');
+
+                callback(new Error('NextLevelDB Server Error'));
+            }
+            */
+
+
+
+
+
+
+            if (message_type === RECORD_PAGING_NONE) {
+
+                if (decode) {
+                    ws_response_handlers[idx] = function (obj_message) {
+                        [response_type_code, pos] = xas2.read(obj_message, pos);
+                        var buf_the_rest = Buffer.alloc(obj_message.length - pos);
+                        obj_message.copy(buf_the_rest, 0, pos);
+
+                        // decode this buffer, it's binary encoding.
+
+                        //console.log('buf_the_rest', buf_the_rest);
+                        //console.log('buf_the_rest.length', buf_the_rest.length);
+
+                        //let decoded = Binary_Encoding.decode(buf_the_rest);
+
+                        var row_buffers = Binary_Encoding.get_row_buffers(buf_the_rest);
+
+                        let decoded = Model_Database.decode_model_rows(row_buffers);
+                        //console.log('decoded', decoded);
+
+                        callback(null, decoded);
+                        ws_response_handlers[idx] = null;
+                    };
+                } else {
+                    ws_response_handlers[idx] = function (obj_message) {
+                        [response_type_code, pos] = xas2.read(obj_message, pos);
+                        //console.log('PAGING_NONE obj_message', obj_message);
+
+                        let buf_the_rest = Buffer.alloc(obj_message.length - pos);
+                        obj_message.copy(buf_the_rest, 0, pos);
+
+                        // Remove the paging info from it.
+
+                        // Could look in the response to see what message we have, if it indicates paging.
+                        //  However, it's a binary message
+
+                        callback(null, buf_the_rest);
+                        ws_response_handlers[idx] = null;
+                    };
+                }
+                // could remove the response handler here
+            }
+            // The response handler itself could be an observable object.
+
+
+            if (message_type === RECORD_PAGING_FLOW) {
+                ws_response_handlers[idx] = function (obj_message, page_number) {
+
+                    console.log('PAGING_FLOW obj_message', obj_message);
+
+                    // Decode it?
+
+
+
+                    //let [response_type_code, pos] = xas2.read(obj_message, 0);
+                    //console.log('response_type_code', response_type_code);
+
+
+
+                    //let buf_the_rest = Buffer.alloc(obj_message.length - pos);
+                    //obj_message.copy(buf_the_rest, 0, pos);
+
+
+                    // xas2 read and copy?
+                    //  where we don't need the position, but just need the rest of the buffer.
+
+
+                    // Could look in the response to see what message we have, if it indicates paging.
+                    //  However, it's a binary message
+
+                    callback(null, obj_message, page_number);
+                    //ws_response_handlers[idx] = null;
+                };
+                // could remove the response handler here
+            }
+            if (message_type === RECORD_PAGING_LAST) {
+                ws_response_handlers[idx] = function (obj_message, page_number) {
+
+                    // Could look in the response to see what message we have, if it indicates paging.
+                    //  However, it's a binary message
+
+                    callback(null, obj_message, page_number, true);
+                    ws_response_handlers[idx] = null;
+                };
+                // could remove the response handler here
+            }
+
+
+            // KEY PAGING
+
+            if (message_type === KEY_PAGING_NONE) {
+
+                if (decode) {
+                    ws_response_handlers[idx] = function (obj_message) {
+                        [response_type_code, pos] = xas2.read(obj_message, pos);
+                        var buf_the_rest = Buffer.alloc(obj_message.length - pos);
+                        obj_message.copy(buf_the_rest, 0, pos);
+
+                        // decode this buffer, it's binary encoding.
+
+                        //console.log('buf_the_rest', buf_the_rest);
+                        //console.log('buf_the_rest.length', buf_the_rest.length);
+
+                        //let decoded = Binary_Encoding.decode(buf_the_rest);
+
+                        var row_buffers = Binary_Encoding.get_row_buffers(buf_the_rest);
+
+                        let decoded = Model_Database.decode_model_rows(row_buffers);
+                        //console.log('decoded', decoded);
+
+                        callback(null, decoded);
+                        ws_response_handlers[idx] = null;
+                    };
+                } else {
+                    ws_response_handlers[idx] = function (obj_message) {
+                        [response_type_code, pos] = xas2.read(obj_message, pos);
+                        //console.log('PAGING_NONE obj_message', obj_message);
+
+                        let buf_the_rest = Buffer.alloc(obj_message.length - pos);
+                        obj_message.copy(buf_the_rest, 0, pos);
+
+                        // Remove the paging info from it.
+
+                        // Could look in the response to see what message we have, if it indicates paging.
+                        //  However, it's a binary message
+
+                        callback(null, buf_the_rest);
+                        ws_response_handlers[idx] = null;
+                    };
+                }
+                // could remove the response handler here
+            }
+            // The response handler itself could be an observable object.
+
+
+            if (message_type === KEY_PAGING_FLOW) {
+                ws_response_handlers[idx] = function (obj_message, page_number) {
+
+                    console.log('PAGING_FLOW obj_message', obj_message);
+
+                    // Decode it?
+
+
+
+                    //let [response_type_code, pos] = xas2.read(obj_message, 0);
+                    //console.log('response_type_code', response_type_code);
+
+
+
+                    //let buf_the_rest = Buffer.alloc(obj_message.length - pos);
+                    //obj_message.copy(buf_the_rest, 0, pos);
+
+
+                    // xas2 read and copy?
+                    //  where we don't need the position, but just need the rest of the buffer.
+
+
+                    // Could look in the response to see what message we have, if it indicates paging.
+                    //  However, it's a binary message
+
+                    callback(null, obj_message, page_number);
+                    //ws_response_handlers[idx] = null;
+                };
+                // could remove the response handler here
+            }
+            if (message_type === KEY_PAGING_LAST) {
+                ws_response_handlers[idx] = function (obj_message, page_number) {
+
+                    // Could look in the response to see what message we have, if it indicates paging.
+                    //  However, it's a binary message
+
+                    callback(null, obj_message, page_number, true);
+                    ws_response_handlers[idx] = null;
+                };
+                // could remove the response handler here
+            }
+
+
+
+
         } else {
+            console.log('*** idx', idx);
             ws_response_handlers[idx] = function (obj_message) {
 
                 // Could look in the response to see what message we have, if it indicates paging.
@@ -601,11 +939,8 @@ class LL_NextLevelDB_Client extends Evented_Class {
             pos = 0,
             message_type, response_type_code, page_number;
 
-
         var buf_2 = Buffer.concat([xas2(idx).buffer, message]);
-
         let res = new Evented_Class();
-
 
         // [message_type, pos] = xas2.read(buf_message, pos);
         ws_response_handlers[idx] = (obj_message) => {
@@ -617,40 +952,106 @@ class LL_NextLevelDB_Client extends Evented_Class {
 
             [message_type, pos] = xas2.read(obj_message, pos);
 
-            //console.log('message_type', message_type);
+            console.log('* message_type', message_type);
             //console.trace();
             //throw 'stop';
 
             //console.log('pos', pos);
-            var buf_the_rest = Buffer.alloc(obj_message.length - pos);
-            obj_message.copy(buf_the_rest, 0, pos);
+
+            // Code has become more complicated now that decoding is being built into the low level client.
+            //  Not sure that's the best design decision.
+            //  However, the decoding type has now been put into the protocol, within the messages, so it's on a lower level.
+            //   The low level API has become more complex.
+
+            console.log('decode', decode);
+
 
             if (decode) {
 
                 if (message_type === BINARY_PAGING_NONE) {
-                    let decoded = Binary_Encoding.decode(buf_the_rest);
-                    res.raise('onNext', decoded);
-                    res.raise('onComplete');
+
+                    console.log('BINARY_PAGING_NONE', BINARY_PAGING_NONE);
+
+                    var buf_the_rest = Buffer.alloc(obj_message.length - pos);
+                    obj_message.copy(buf_the_rest, 0, pos);
+                    //console.log('buf_the_rest', buf_the_rest);
+                    let decoded = Binary_Encoding.decode_buffer(buf_the_rest)[0];
+                    console.log('** decoded', decoded);
+
+                    // Events just handling true and false....
+                    res.raise('next', decoded);
+                    res.raise('complete', decoded);
                 }
                 if (message_type === BINARY_PAGING_FLOW) {
-                    let decoded = Binary_Encoding.decode(buf_the_rest);
-                    res.raise('onNext', decoded);
+                    var buf_the_rest = Buffer.alloc(obj_message.length - pos);
+                    obj_message.copy(buf_the_rest, 0, pos);
+
+                    let decoded = Binary_Encoding.decode_buffer(buf_the_rest)[0];
+                    res.raise('next', decoded);
                 }
                 if (message_type === BINARY_PAGING_LAST) {
-                    let decoded = Binary_Encoding.decode(buf_the_rest);
-                    res.raise('onNext', decoded);
-                    res.raise('onComplete');
+                    var buf_the_rest = Buffer.alloc(obj_message.length - pos);
+                    obj_message.copy(buf_the_rest, 0, pos);
+
+                    let decoded = Binary_Encoding.decode_buffer(buf_the_rest)[0];
+                    //console.log('decoded', decoded);
+
+                    res.raise('next', decoded);
+                    res.raise('complete', decoded);
                 }
+
+                // KEY_PAGING_NONE
+                //  Returning pages or buffers of keys could be a useful base level feature.
 
                 if (message_type === RECORD_PAGING_NONE) {
-                    let arr_bufs_kv = Binary_Encoding.split_length_item_encoded_buffer_to_kv(buf_the_rest);
-                    let remove_kp = true;
-                    let arr_decoded = Model_Database.decode_model_row(arr_bufs_kv[0], remove_kp);
+                    var buf_the_rest = Buffer.alloc(obj_message.length - pos);
+                    obj_message.copy(buf_the_rest, 0, pos);
+                    console.log('buf_the_rest', buf_the_rest);
 
-                    res.raise('onNext', arr_decoded);
-                    res.raise('onComplete');
+
+                    // Seems like another binary format is necessary, and this could make it somewhat difficult to keep it continuing with the current server.
+                    //  Could use pm2 to restart it with new code.
+
+                    // Specifying that they are records seems useful.
+
+                    // Would be good to deploy it onto a 2nd server, keep the data coming in, and then to get records from accross servers.
+                    //  Will focus on streaming data, and having servers copy that streaming data from each other.
+
+                    // Think it will be necessary to change both the client and server handling of data.
+
+                    // Or to get the client to work, even with the current bugs.
+                    // However, the server, including the currently deployed one that's been going for days, has got incorrect / inconsistent data sending.
+
+                    // Seems worthwhile to carefully make a new client/server version, get it running elsewhere, test it, and then deploy that onto the running DB.
+                    //  Could improve the client so that the collector will buffer unsent messages, and then send them when the server becomes available again.
+
+                    // Keeping the current process running, while making substantial fixes / improvements to the client and server makes the most sense.
+                    //  Could be worth running and testing on the xeon system for the moment.
+
+                    // Deploy upgraded / fixed client and server software to that xeon, then stream data from it.
+                    //  Key streams seem like they will be a useful data transmission system.
+                    //   These would be useful for checking if records exist, but blockchain verification will be better / more full featured in the long run.
+
+                    // kv for records, but just split_length_item_encoded_buffer for keys.
+
+
+
+
+                    let arr_bufs_kv = Binary_Encoding.split_length_item_encoded_buffer_to_kv(buf_the_rest);
+                    //console.log('arr_bufs_kv', arr_bufs_kv);
+
+                    let remove_kp = true;
+                    let arr_decoded = Model_Database.decode_model_rows(arr_bufs_kv[0], remove_kp);
+
+                    console.log('arr_decoded', arr_decoded);
+                    throw 'stop';
+
+                    res.raise('next', arr_decoded);
+                    res.raise('complete');
                 }
                 if (message_type === RECORD_PAGING_FLOW) {
+                    var buf_the_rest = Buffer.alloc(obj_message.length - pos);
+                    obj_message.copy(buf_the_rest, 0, pos);
                     //console.log('buf_the_rest', buf_the_rest);
 
                     // Need to get some specific values for the flow decoding.
@@ -665,63 +1066,144 @@ class LL_NextLevelDB_Client extends Evented_Class {
 
                     let buf2 = Buffer.alloc(buf_the_rest.length - pos);
                     buf_the_rest.copy(buf2, 0, pos);
-
                     //console.log('buf2', buf2);
-
-
-
-
                     // read and copy buffer.
-
-
-
                     let arr_bufs_kv = Binary_Encoding.split_length_item_encoded_buffer_to_kv(buf2);
-
-
                     let remove_kp = true;
                     //console.log('arr_bufs_kv[0]', arr_bufs_kv[0]);
                     //console.log('arr_bufs_kv', arr_bufs_kv);
                     //throw 'stop';
                     let arr_decoded = Model_Database.decode_model_rows(arr_bufs_kv, remove_kp);
 
-                    res.raise('onNext', arr_decoded);
+                    res.raise('next', arr_decoded);
                 }
                 if (message_type === RECORD_PAGING_LAST) {
+                    var buf_the_rest = Buffer.alloc(obj_message.length - pos);
+                    obj_message.copy(buf_the_rest, 0, pos);
                     [page_number, pos] = xas2.read(buf_the_rest, 0);
-                    console.log('page_number', page_number);
+                    //console.log('page_number', page_number);
                     let buf2 = Buffer.alloc(buf_the_rest.length - pos);
                     buf_the_rest.copy(buf2, 0, pos);
                     let arr_bufs_kv = Binary_Encoding.split_length_item_encoded_buffer_to_kv(buf2);
                     let remove_kp = true;
                     console.log('arr_bufs_kv', arr_bufs_kv);
                     let arr_decoded = Model_Database.decode_model_rows(arr_bufs_kv, remove_kp);
+                    console.log('arr_decoded', arr_decoded);
 
-                    res.raise('onNext', arr_decoded);
-                    res.raise('onComplete');
+                    // Say what page it is?
+
+                    res.raise('next', arr_decoded);
+                    res.raise('complete', arr_decoded);
                 }
+
+                // KEY PAGING observe_send_binary_message
+
+                if (message_type === KEY_PAGING_NONE) {
+                    var buf_the_rest = Buffer.alloc(obj_message.length - pos);
+                    obj_message.copy(buf_the_rest, 0, pos);
+                    console.log('buf_the_rest', buf_the_rest);
+                    let arr_bufs_k = Binary_Encoding.split_length_item_encoded_buffer(buf_the_rest);
+                    console.log('arr_bufs_k', arr_bufs_k);
+
+                    let remove_kp = true;
+
+                    //throw 'stop';
+                    // Decode them as keys.
+                    // decode_keys
+
+
+                    //let arr_decoded = Model_Database.decode_model_rows(arr_bufs_k, remove_kp);
+                    let arr_decoded = Model_Database.decode_keys(arr_bufs_k, remove_kp);
+
+                    console.log('arr_decoded', arr_decoded);
+
+                    //console.trace();
+                    //throw 'stop';
+
+                    res.raise('next', arr_decoded);
+                    res.raise('complete');
+                }
+                if (message_type === KEY_PAGING_FLOW) {
+                    console.log('KEY_PAGING_FLOW');
+                    var buf_the_rest = Buffer.alloc(obj_message.length - pos);
+                    obj_message.copy(buf_the_rest, 0, pos);
+                    pos = 0;
+                    //console.log('buf_the_rest', buf_the_rest);
+
+                    // Need to get some specific values for the flow decoding.
+                    //  
+
+                    //[response_type_code, pos] = xas2.read(obj_message, pos);
+                    //console.log('response_type_code', response_type_code);
+                    //console.log('pos', pos);
+
+                    [page_number, pos] = xas2.read(buf_the_rest, pos);
+                    //console.log('page_number', page_number);
+
+                    let buf2 = Buffer.alloc(buf_the_rest.length - pos);
+                    buf_the_rest.copy(buf2, 0, pos);
+
+                    //console.log('buf2', buf2);
+
+
+
+
+                    // read and copy buffer.    
+
+
+                    let arr_bufs_keys = Binary_Encoding.split_length_item_encoded_buffer(buf2);
+
+
+                    let remove_kp = false;
+                    //console.log('arr_bufs_kv[0]', arr_bufs_kv[0]);
+                    //console.log('arr_bufs_kv', arr_bufs_kv);
+                    //throw 'stop';
+                    let arr_decoded = Model_Database.decode_keys(arr_bufs_keys, remove_kp);
+
+                    res.raise('next', arr_decoded);
+                }
+                if (message_type === KEY_PAGING_LAST) {
+                    var buf_the_rest = Buffer.alloc(obj_message.length - pos);
+                    obj_message.copy(buf_the_rest, 0, pos);
+                    [page_number, pos] = xas2.read(buf_the_rest, 0);
+                    console.log('page_number', page_number);
+                    let buf2 = Buffer.alloc(buf_the_rest.length - pos);
+                    buf_the_rest.copy(buf2, 0, pos);
+                    let arr_bufs_k = Binary_Encoding.split_length_item_encoded_buffer(buf2);
+                    let remove_kp = false;
+                    //console.log('arr_bufs_kv', arr_bufs_kv);
+                    let arr_decoded = Model_Database.decode_keys(arr_bufs_k, remove_kp);
+
+                    res.raise('next', arr_decoded);
+                    res.raise('complete');
+                }
+
+
+
+
             } else {
                 if (message_type === BINARY_PAGING_NONE) {
-                    res.raise('onNext', buf_the_rest);
-                    res.raise('onComplete');
+                    res.raise('next', buf_the_rest);
+                    res.raise('complete', buf_the_rest);
                 }
                 if (message_type === BINARY_PAGING_FLOW) {
-                    res.raise('onNext', buf_the_rest);
+                    res.raise('next', buf_the_rest);
                 }
                 if (message_type === BINARY_PAGING_LAST) {
-                    res.raise('onNext', buf_the_rest);
-                    res.raise('onComplete');
+                    res.raise('next', buf_the_rest);
+                    res.raise('complete');
                 }
 
                 if (message_type === RECORD_PAGING_NONE) {
-                    res.raise('onNext', buf_the_rest);
-                    res.raise('onComplete');
+                    res.raise('next', buf_the_rest);
+                    res.raise('complete');
                 }
                 if (message_type === RECORD_PAGING_FLOW) {
-                    res.raise('onNext', buf_the_rest);
+                    res.raise('next', buf_the_rest);
                 }
                 if (message_type === RECORD_PAGING_LAST) {
-                    res.raise('onNext', buf_the_rest);
-                    res.raise('onComplete');
+                    res.raise('next', buf_the_rest);
+                    res.raise('complete');
                 }
             }
 
@@ -754,6 +1236,7 @@ class LL_NextLevelDB_Client extends Evented_Class {
     // Whether there is paging or not, where in the paging
 
 
+    /*
 
     observe_send_binary_message_decode(message) {
         var idx = this.id_ws_req++,
@@ -780,20 +1263,21 @@ class LL_NextLevelDB_Client extends Evented_Class {
 
 
             if (message_type === PAGING_NONE) {
-                res.raise('onNext', buf_the_rest);
-                res.raise('onComplete');
+                res.raise('next', buf_the_rest);
+                res.raise('complete');
             }
             if (message_type === PAGING_FLOW) {
-                res.raise('onNext', buf_the_rest);
+                res.raise('next', buf_the_rest);
             }
             if (message_type === PAGING_LAST) {
-                res.raise('onNext', buf_the_rest);
-                res.raise('onComplete');
+                res.raise('next', buf_the_rest);
+                res.raise('complete');
             }
         };
         this.websocket_connection.sendBytes(buf_2);
         return res;
     }
+    */
 
     // send_binary_message_paging
     //  would know to read paging data from the message reply, to see if it's the last.
@@ -914,6 +1398,11 @@ class LL_NextLevelDB_Client extends Evented_Class {
     // Make this one return an observable for the moment.
 
     ll_get_all_records(paging, decode = false) {
+
+
+        // This could have an optional callback.
+
+
         // LL_GET_ALL_RECORDS
 
         // can we do this through a single callback?
@@ -930,6 +1419,7 @@ class LL_NextLevelDB_Client extends Evented_Class {
         }
         */
         if (!paging instanceof Paging) paging = new Paging.Record_Paging(paging);
+
         buf_query = Buffer.concat([xas2(LL_GET_ALL_RECORDS).buffer, paging.buffer]);
         // Then this send function could have multiple callbacks?
         //let res = new Evented_Class();
@@ -947,29 +1437,31 @@ class LL_NextLevelDB_Client extends Evented_Class {
 
         // observe send binary message, decode
 
-
+        // Paging object could be included in the observe_send_binary_message
+        //  Or use observe_send_binary_paging_message
+        //   observe_send_binary_nopaging_message could be for internal use.
 
         let obs_msg = this.observe_send_binary_message(buf_query, decode);
 
         // We could return that observable, or a different observable if there is some processing to do.
         /*
-        obs_msg.subscribe('onNext', page => {
+        obs_msg.subscribe('next', page => {
             //console.log('page', page);
         })
-        obs_msg.subscribe('onError', page => {
+        obs_msg.subscribe('error', page => {
             //console.log('page', page);
         })
-        obs_msg.subscribe('onCompleted', () => {
-            //console.log('onCompleted');
+        obs_msg.subscribe('completed', () => {
+            //console.log('completed');
         });
         */
         return obs_msg;
         /*
 
         
-        onNext — Called each time the observable emits a value.
-        onError — Called when the observable encounters an error or fails to generate the data to emit. After an error, no further values will be emitted, and `onCompleted` will not be called.
-        onCompleted — Called after it has called `onNext` for the final time, but only if no errors were encountered.
+        next — Called each time the observable emits a value.
+        error — Called when the observable encounters an error or fails to generate the data to emit. After an error, no further values will be emitted, and `completed` will not be called.
+        completed — Called after it has called `next` for the final time, but only if no errors were encountered.
 
         this.send_binary_message(buf_query, (err, res_binary_message) => {
             if (err) {
@@ -991,6 +1483,14 @@ class LL_NextLevelDB_Client extends Evented_Class {
      * @memberof LL_NextLevelDB_Client
      */
     ll_get_records_by_key_prefix(key_prefix, callback) {
+
+        // Should probably use a sig test in the client.
+        //  Maybe will want decoding in the client too.
+        //console.log('ll_get_records_by_key_prefix');
+
+
+
+
         var buf_kp = xas2(key_prefix).buffer;
         var buf_0 = Buffer.alloc(1);
         buf_0.writeUInt8(0, 0);
@@ -1072,20 +1572,58 @@ class LL_NextLevelDB_Client extends Evented_Class {
      * @memberof LL_NextLevelDB_Client
      */
     ll_get_keys_in_range(buf_l, buf_u, callback) {
-        var paging = new Paging.None();
-        var buf_command = xas2(LL_GET_KEYS_IN_RANGE).buffer;
-        var buf_query = Buffer.concat([buf_command, paging.buffer, xas2(buf_l.length).buffer, buf_l, xas2(buf_u.length).buffer, buf_u]);
 
-        // 
+        let a = arguments;
+        let sig = get_a_sig(a);
 
-        this.observe_send_binary_message(buf_query, (err, res_binary_message) => {
-            if (err) {
-                callback(err);
-            } else {
-                var arr_key_buffers = Binary_Encoding.split_length_item_encoded_buffer(res_binary_message);
-                callback(null, arr_key_buffers);
-            }
-        });
+        console.log('sig', sig);
+
+        //throw 'stop';
+
+        // When used with a callback, this should not return an observer.
+
+        if (sig === '[B,B]') {
+            // Paging object not given
+            var paging = new Paging.None();
+            var buf_command = xas2(LL_GET_KEYS_IN_RANGE).buffer;
+            var buf_query = Buffer.concat([buf_command, paging.buffer, xas2(buf_l.length).buffer, buf_l, xas2(buf_u.length).buffer, buf_u]);
+
+            // 
+            throw 'stop';
+            let obs = this.observe_send_binary_message(buf_query, (err, res_binary_message) => {
+                if (err) {
+                    callback(err);
+                } else {
+                    var arr_key_buffers = Binary_Encoding.split_length_item_encoded_buffer(res_binary_message);
+                    callback(null, arr_key_buffers);
+                }
+            });
+        } else if (sig === '[B,B,f]') {
+            // last param is a callback
+
+            var paging = new Paging.None();
+            var buf_command = xas2(LL_GET_KEYS_IN_RANGE).buffer;
+            var buf_query = Buffer.concat([buf_command, paging.buffer, xas2(buf_l.length).buffer, buf_l, xas2(buf_u.length).buffer, buf_u]);
+
+
+            this.send_binary_message(buf_query, (err, res_binary_message) => {
+                if (err) {
+                    callback(err);
+                } else {
+                    var arr_key_buffers = Binary_Encoding.split_length_item_encoded_buffer(res_binary_message);
+                    callback(null, arr_key_buffers);
+                }
+            });
+
+
+
+        } else {
+            console.log('sig', sig);
+            throw 'NYI';
+        }
+
+
+
     }
 
 
@@ -1131,6 +1669,13 @@ class LL_NextLevelDB_Client extends Evented_Class {
 
     ll_get_records_in_range(buf_l, buf_u, callback) {
         // 
+        // Could have paging and observable options here in this function.
+        //  Basically need to implement them all over the place in a flexible way.
+
+        let a = arguments,
+            sig = get_a_sig(arguments);
+
+        //console.log('sig', sig);
 
         var paging = new Paging.None();
         var buf_command = xas2(LL_GET_RECORDS_IN_RANGE).buffer;
@@ -1140,10 +1685,17 @@ class LL_NextLevelDB_Client extends Evented_Class {
         // What type of paging?
         //  For the moment, no paging.
 
+        // Do it this way if we are not using an observable
+
         this.send_binary_message(buf_query, RECORD_PAGING_NONE, (err, res_binary_message) => {
             if (err) {
                 callback(err);
             } else {
+                // But if it's an error message, should call the error callback.
+                //  Likely at an earlier stage.
+
+                //console.log('res_binary_message', res_binary_message);
+
                 var arr_kv_buffers = Binary_Encoding.split_length_item_encoded_buffer_to_kv(res_binary_message);
                 callback(null, arr_kv_buffers);
             }
@@ -1303,6 +1855,11 @@ class LL_NextLevelDB_Client extends Evented_Class {
         var paging = new Paging.None();
         var buf_command = xas2(LL_COUNT_KEYS_IN_RANGE_UP_TO).buffer;
         // the lengths of the buffers too...
+
+
+        // send_key_range_message
+        //  Could include the limit in the paging buffer?
+
         var buf_query = Buffer.concat([buf_command, paging.buffer, xas2(limit).buffer, xas2(buf_l.length).buffer, buf_l, xas2(buf_u.length).buffer, buf_u]);
         //var buf_l = 
         // Include a paging buffer too...?
@@ -1328,9 +1885,105 @@ class LL_NextLevelDB_Client extends Evented_Class {
                 callback(err);
             } else {
 
-                callback(null, res_binary_message);
+                // empty record...
+
+                if (res_binary_message.length === 0) {
+                    console.log('ll_get_record res_binary_message', res_binary_message);
+                    callback(null, undefined);
+                } else {
+                    console.log('ll_get_record res_binary_message', res_binary_message);
+                    callback(null, res_binary_message);
+                }
+
+
+
             }
         });
+    }
+
+    // Getting table fields data to the client, 
+    get_table_field_info(table, callback) {
+        // Want this to be more polymorphic.
+
+        //  May need to ensure the model is OK to start with.
+        // Probably worth consulting the model.
+
+        // Table could either be an int or string.
+
+        let table_name, table_id;
+        let t_table = tof(table);
+        if (t_table === 'string') {
+            table_name = table;
+        }
+        if (t_table === 'number') {
+            table_id = table;
+        }
+
+        // should call it using the table id, as it makes for a smaller message.
+
+        if (table_id === undefined) {
+            this.get_table_id_by_name(table_name, (err, id) => {
+                if (err) {
+                    callback(err);
+                } else {
+                    table_id = id;
+                    proceed();
+                }
+            })
+        }
+
+        let proceed = () => {
+            console.log('table_id', table_id);
+
+            // Send the message
+
+            // Other, easier to use message sending functions would be useful here.
+            //  builds up the binary buffer itself. Always set to decode on receipt.
+
+            // could upgrade send_binary_message, so if it does not have buffers to start with, it encodes the data into buffers.
+
+
+            /*
+            let model_table = this.model.map_tables_by_id(table_id);
+
+            let model_fields = model_table.fields;
+            console.log('model_fields', model_fields);
+
+            each(model_fields, model_field => {
+                console.log('model_field', model_field);
+            })
+
+            */
+
+            //var buf_command = xas2(GET_TABLE_FIELDS_INFO).buffer;
+
+            // Decoding wanted.
+
+            // 
+            var buf_query = Buffer.concat([xas2(GET_TABLE_FIELDS_INFO).buffer, xas2(table_id).buffer]);
+            //var buf_l = 
+            // Include a paging buffer too...?
+
+            //console.log('get_table_field_info buf_query', buf_query);
+            this.send_binary_message(buf_query, BINARY_PAGING_NONE, true, (err, table_fields_info) => {
+                if (err) {
+                    callback(err);
+                } else {
+                    //var count, pos;
+                    //[count, pos] = xas2.read(res_binary_message, 0);
+                    //console.log('table_fields_info', table_fields_info);
+                    callback(null, table_fields_info);
+                }
+            });
+
+
+
+
+
+        }
+
+
+
     }
 
 
@@ -1345,15 +1998,67 @@ class LL_NextLevelDB_Client extends Evented_Class {
      * @param {any} callback 
      * @memberof LL_NextLevelDB_Client
      */
-    'll_get_all_keys' (paging, callback) {
+
+    // Will change to an observable interface.
+    //  However, could have an opt_cb function to allow the function to execute with a callback, possibly building up the data using an observable on the client.
+    //  Generally want to encourage use of paging while communicating, even if the whole data structure is requested.
+    //  
+
+
+    // For the moment, should change quite a few functions to an Observer API.
+    //  
+
+
+    'll_get_all_keys' (paging, decode = false) {
+
+        // Could use fn sigs, maybe will call this with a callback function.
+
+
+
+
+        let a = arguments;
+        a.l = a.length;
+
+        let sig = get_item_sig(a);
+
+        console.log('sig', sig);
+        console.trace();
+        throw 'stop';
+
+
+
+        // Polymorphism here?
+        //  Allow it to use a callback rather than observable?
+
+
+        /*
         var buf_query, pos = 0;
         if (!callback) {
             callback = arguments[0];
             paging = new Paging.None();
         }
+
+        */
+        //if (!paging instanceof Paging) paging = new Paging.Record_Paging(paging);
+        //buf_query = Buffer.concat([xas2(LL_GET_ALL_KEYS).buffer, paging.buffer]);
+
+
+        // use an observer instead.
+        //  Maybe just in the case of paging.
+
+
+
+        var buf_query, pos = 0;
         if (!paging instanceof Paging) paging = new Paging.Record_Paging(paging);
         buf_query = Buffer.concat([xas2(LL_GET_ALL_KEYS).buffer, paging.buffer]);
+        let obs_msg = this.observe_send_binary_message(buf_query, decode);
+        return obs_msg;
 
+
+
+
+
+        /*
         this.send_binary_message(buf_query, (err, res_binary_message) => {
             if (err) {
                 callback(err);
@@ -1361,6 +2066,7 @@ class LL_NextLevelDB_Client extends Evented_Class {
                 callback(null, res_binary_message);
             }
         });
+        */
         //this._json_get_request('query/all_keys', callback);
     }
 
@@ -1379,25 +2085,78 @@ class LL_NextLevelDB_Client extends Evented_Class {
      * @memberof LL_NextLevelDB_Client
      */
     'll_count_records' (callback) {
-        var buf_query = Buffer.concat([xas2(LL_COUNT_RECORDS).buffer]);
-        // set up the response handler...
-        this.send_binary_message(buf_query, (err, res_binary_message) => {
-            if (err) {
-                callback(err);
-            } else {
-                var count, pos = 0;
-                // Read that it's got no paging too
 
-                // Could strip that page variable previously.
+        let a = arguments,
+            delay, paging, decode = true;
+        a.l = a.length;
+        let sig = get_a_sig(a);
+        console.log('sig', sig);
+        console.log('a.l', a.l);
 
-                if (return_message_type) {
+        if (sig === '[]') {
+            delay = 1000;
+            paging = new Paging.Timed(delay);
+        }
+        if (sig === '[f]') {
 
+        }
+        if (sig === '[n]') {
+            delay = a[0];
+            paging = new Paging.Timed(delay);
+            callback = null;
+        }
+
+        //throw 'stop';
+
+        // Can be given a paging param rather than 
+
+
+        // Could be called without a callback, meaning we get an observer back.
+
+        if (callback) {
+            var buf_query = Buffer.concat([xas2(LL_COUNT_RECORDS).buffer]);
+            // set up the response handler...
+            this.send_binary_message(buf_query, (err, res_binary_message) => {
+                if (err) {
+                    callback(err);
+                } else {
+                    var count, pos = 0;
+                    // Read that it's got no paging too
+
+                    // Could strip that page variable previously.
+
+                    if (return_message_type) {
+
+                    }
+
+                    [count, pos] = x.read(res_binary_message, pos);
+                    callback(null, count);
                 }
+            });
+        } else {
+            console.log('ll_count_records with observer');
 
-                [count, pos] = x.read(res_binary_message, pos);
-                callback(null, count);
-            }
-        });
+            // would 
+
+            if (!paging instanceof Paging) paging = new Paging.Timed(paging);
+            console.log('paging', paging);
+            buf_query = Buffer.concat([xas2(LL_COUNT_RECORDS).buffer, paging.buffer]);
+
+
+            let obs_msg = this.observe_send_binary_message(buf_query, decode);
+
+            // Will be getting periodic counts back from the server.
+            //  They will be binary records.
+            //  The server sill see that timed paging is being requested.
+
+            //throw 'NYI';
+
+            // Will use the observer message system.
+            return obs_msg;
+
+        }
+
+
     }
 
     /**
@@ -1409,6 +2168,9 @@ class LL_NextLevelDB_Client extends Evented_Class {
      */
     'll_put_records_buffer' (buf_records, callback) {
         // PUT_RECORDS
+
+        // Output decoding looks like it would be useful here.
+
         var buf_query = Buffer.concat([xas2(LL_PUT_RECORDS).buffer, buf_records]);
         //console.log('buf_query', buf_query);
 
@@ -1457,6 +2219,12 @@ class LL_NextLevelDB_Client extends Evented_Class {
     'ensure_table' (arr_table, callback) {
         // arr_table could be multiple tables.
 
+        let a = arguments,
+            sig = get_a_sig(a);
+
+        // Without a callback, will use an observable / promise
+        //  or Resolvable.
+
         let buf_encoded_table = Binary_Encoding.flexi_encode_item(arr_table);
         var buf_query = Buffer.concat([xas2(ENSURE_TABLE).buffer, buf_encoded_table]);
 
@@ -1476,6 +2244,100 @@ class LL_NextLevelDB_Client extends Evented_Class {
                 // Don't know if it would be useful to get back the ids.
             }
         });
+
+    }
+
+    'ensure_tables' (arr_tables, decode = true, callback) {
+        let a = arguments,
+            sig = get_a_sig(a);
+
+        if (sig === '[a,f]') {
+            decode = true;
+            callback = a[1];
+        }
+        if (sig === '[a,b]') {
+            //decode = true;
+        }
+        if (sig === '[a,b,f]') {
+
+        }
+
+        //console.log('client arr_tables', arr_tables);
+
+        let buf_encoded_tables = Binary_Encoding.flexi_encode_item(arr_tables);
+        var buf_query = Buffer.concat([xas2(ENSURE_TABLES).buffer, buf_encoded_tables]);
+
+
+        // Need to have the server deal with the observer version.
+        //  Nicer to have a message for each table.
+        //console.log('decode', decode);
+        //throw 'stop';
+        let obs_res = this.observe_send_binary_message(buf_query, decode);
+        console.log('obs_res', obs_res);
+        //throw 'stop';
+        if (callback) {
+            throw 'NYI'
+        } else {
+            // 
+            return obs_res;
+
+            /*
+            if (decode) {
+                // An observable map would help with this.???
+
+            } else {
+
+            }
+            */
+        }
+
+    }
+
+    'table_exists' (table_name, callback) {
+        // Binary callback mechanism.
+        // Inner function using a callback
+        let inner = (icb) => {
+            let buf_encoded = Binary_Encoding.flexi_encode_item(table_name);
+            var buf_query = Buffer.concat([xas2(TABLE_EXISTS).buffer, buf_encoded]);
+            this.send_binary_message(buf_query, (err, exists) => {
+                if (err) {
+                    icb(err);
+                } else {
+                    icb(null, exists);
+                }
+            })
+        }
+
+        if (callback) {
+            inner(callback);
+        } else {
+            // Return a promise / observer / another resolvable.
+            throw 'NYI';
+        }
+
+
+    }
+
+    'get_table_id_by_name' (table_name, callback) {
+        console.log('get_table_id_by_name table_name', table_name);
+        let inner = (icb) => {
+            let buf_encoded = Binary_Encoding.flexi_encode_item(table_name);
+            var buf_query = Buffer.concat([xas2(TABLE_ID_BY_NAME).buffer, buf_encoded]);
+            this.send_binary_message(buf_query, BINARY_PAGING_NONE, true, (err, table_id) => {
+                if (err) {
+                    icb(err);
+                } else {
+                    console.log('table_id', table_id);
+                    icb(null, table_id);
+                }
+            })
+        }
+        if (callback) {
+            inner(callback);
+        } else {
+            // Return a promise / observer / another resolvable.
+            throw 'NYI';
+        }
 
     }
 
@@ -1500,8 +2362,31 @@ var local_info = {
 // Think this requires the new version of the server code.
 
 
+
+
 if (require.main === module) {
-    var lc = new LL_NextLevelDB_Client(local_info);
+    var config = require('my-config').init({
+        path: path.resolve('../../config/config.json') //,
+        //env : process.env['NODE_ENV']
+        //env : process.env
+    });
+
+    /*
+    var app_config = require('my-config').init({
+        path: path.resolve('./app-config.json') //,
+        //env : process.env['NODE_ENV']
+        //env : process.env
+    });
+    
+    Object.assign(config, app_config);
+    */
+
+
+    // data1
+    //var server_data1 = config.nextleveldb_connections.data1;
+    var server_data1 = config.nextleveldb_connections.localhost;
+
+    var lc = new LL_NextLevelDB_Client(server_data1);
 
     // Looks like the level client keeps itself open.
     //  console.log('pre start');
@@ -1523,6 +2408,8 @@ if (require.main === module) {
 
             var test_get_all_keys = function () {
                 // And different tests for using paging.
+
+
                 lc.ll_get_all_keys((err, buf_all_keys) => {
                     // Should get them as an array.
 
@@ -1582,6 +2469,55 @@ if (require.main === module) {
                     if (err) {
                         throw err;
                     } else {
+                        //console.log('count', count);
+                        // want a higher level get all records too.
+
+                        //  maybe not really worth having the ll version?
+
+                        //  may look into observable transformers.
+
+
+                        let decode = true;
+                        let obs = lc.ll_get_all_records(new Paging.Record_Paging(64), decode);
+                        // Need to be able to page the records into another instance of the DB.
+
+                        // Called without a callback, with paging option, so it returns an observable which gives the results.
+
+                        // Want a less low level version of it that decodes the records.
+
+                        // Could use an observable transformer.
+
+                        console.log('obs', obs);
+                        let c = 0;
+                        obs.subscribe('next', (res) => {
+                            //console.log('obs next res', res);
+                            c = c + res.length;
+                            console.log('obs next res.length', res.length);
+                        });
+                        obs.subscribe('error', (err) => {
+                            console.log('obs err', err);
+                            console.trace();
+                        });
+                        obs.subscribe('complete', () => {
+                            console.log('c', c);
+                            console.log('obs complete');
+
+                        });
+                        // Paged get records is good for copying data from one db to another.
+                    }
+                })
+            };
+            //test_paged_get_all_records();
+
+
+            var test_paged_get_all_keys = () => {
+                // Subscriptions don't get error events back?
+                //  Is that the difference?
+                //  Maybe don't do it that way for the moment.
+                lc.ll_count_records((err, count) => {
+                    if (err) {
+                        throw err;
+                    } else {
                         console.log('count', count);
 
 
@@ -1591,34 +2527,144 @@ if (require.main === module) {
 
                         //  may look into observable transformers.
 
+
+
                         let decode = true;
 
-                        let obs = lc.ll_get_all_records(new Paging.Record_Paging(16), decode);
-
-                        // Called without a callback, with paging option, so it returns an observable which gives the results.
-
-                        // Want a less low level version of it that decodes the records.
-
-                        // Could use an observable transformer.
-
-
+                        let obs = lc.ll_get_all_keys(new Paging.Record_Paging(64), decode);
 
                         console.log('obs', obs);
-                        obs.subscribe('onNext', (res) => {
-                            console.log('obs next', res);
+                        let c = 0;
+                        obs.subscribe('next', (res) => {
+                            console.log('obs next res', res);
+                            c = c + res.length;
+                            console.log('obs next res.length', res.length);
                         });
-                        obs.subscribe('onError', (err) => {
+                        obs.subscribe('error', (err) => {
                             console.log('obs err', err);
                             console.trace();
                         });
-                        obs.subscribe('onComplete', () => {
+                        obs.subscribe('complete', () => {
+                            console.log('c', c);
                             console.log('obs complete');
+
+                        });
+                        // Paged get records is good for copying data from one db to another.
+
+                    }
+                })
+            };
+            //test_paged_get_all_keys();
+
+            // Think this is higher level.
+            test_paged_get_table_records = () => {
+
+            }
+
+            //test_paged_get_table_records();
+
+            // This would be better with lots of da6ta
+
+            test_timed_paging_count = () => {
+                let obs_count = lc.ll_count_records();
+                console.log('obs_count', obs_count);
+                obs_count.subscribe('next', (res) => {
+                    console.log('obs next res', res);
+                    //c = c + res.length;
+                    console.log('obs next res.length', res.length);
+                });
+                obs_count.subscribe('error', (err) => {
+                    console.log('obs err', err);
+                    console.trace();
+                });
+                obs_count.subscribe('complete', count => {
+                    //console.log('c', c);
+                    console.log('obs complete', count);
+                });
+            }
+            //test_timed_paging_count();
+
+            test_count_table_records = () => {
+
+                // Would be an observer by default.
+
+                // Could still work by counting keys in the ranges...
+                //  Or keys beginning with something.
+
+                // count_table_records seems like a convenient function to make lower level within the server.
+                //  
+
+
+                let obs_count = lc.count_table_records('bittrex market summary snapshots');
+                console.log('obs_count', obs_count);
+                obs_count.subscribe('next', (res) => {
+                    console.log('obs next res', res);
+                    //c = c + res.length;
+                    console.log('obs next res.length', res.length);
+                });
+                obs_count.subscribe('error', (err) => {
+                    console.log('obs err', err);
+                    console.trace();
+                });
+                obs_count.subscribe('complete', count => {
+                    //console.log('c', c);
+                    console.log('obs complete', count);
+                });
+
+            }
+
+            let test_get_table_fields_info = () => {
+
+                // Currently not getting the types
+                //let table_name = 'bittrex market summary snapshots';
+                //let table_name = 'tables';
+                //let table_name = 'bittrex currencies';
+                let table_name = 'bittrex markets';
+
+                // Seems as though the type ids don't get added when ensuring tables.
+                //  Type ids had been there at the start for the system tables.
+                //  Don't want to always require type ids, but always want to provide them when possible.
+
+                // Field info has not been added (seemingly) to tables (autoincrement int xas2 fields), seems OK in some cases.
+                //  When a fk field refers to another, we now know its type.
+
+                // We should know the types of the currency ids in market records because it refers to a table with a pk with its field type set.
+                //  Should soon get on with adding records as appropriate to this existing system.
+
+                // ensure bittrex currency
+                // put market snapshot record.
+
+
+
+
+
+
+                console.log('test_get_table_fields_info');
+                lc.get_table_field_info(table_name, (err, fields_info) => {
+                    if (err) {
+                        throw err;
+                    } else {
+                        console.log('fields_info', fields_info);
+                        each(fields_info, field_info => {
+                            console.log('field_info', JSON.stringify(field_info));
 
                         });
                     }
                 })
-            };
-            test_paged_get_all_records();
+            }
+            test_get_table_fields_info();
+
+
+            /*
+            lc.ll_count_records((err, count) => {
+                if (err) {
+                    throw err;
+                } else {
+                    console.log('count', count);
+                }
+            })
+            */
+
 
         }
     });
