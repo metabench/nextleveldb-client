@@ -1256,9 +1256,9 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
             } else {
                 // 
 
-                console.log('');
-                console.log('***id', id);
-                console.log('');
+                //console.log('');
+                //console.log('***id', id);
+                //console.log('');
                 callback(null, id * 2 + 2);
             }
         });

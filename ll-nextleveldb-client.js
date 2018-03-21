@@ -952,7 +952,7 @@ class LL_NextLevelDB_Client extends Evented_Class {
 
             [message_type, pos] = xas2.read(obj_message, pos);
 
-            console.log('* message_type', message_type);
+            //console.log('* message_type', message_type);
             //console.trace();
             //throw 'stop';
 
@@ -963,7 +963,7 @@ class LL_NextLevelDB_Client extends Evented_Class {
             //  However, the decoding type has now been put into the protocol, within the messages, so it's on a lower level.
             //   The low level API has become more complex.
 
-            console.log('decode', decode);
+            //console.log('decode', decode);
 
 
             if (decode) {
@@ -976,7 +976,7 @@ class LL_NextLevelDB_Client extends Evented_Class {
                     obj_message.copy(buf_the_rest, 0, pos);
                     //console.log('buf_the_rest', buf_the_rest);
                     let decoded = Binary_Encoding.decode_buffer(buf_the_rest)[0];
-                    console.log('** decoded', decoded);
+                    //console.log('** decoded', decoded);
 
                     // Events just handling true and false....
                     res.raise('next', decoded);
@@ -1888,10 +1888,10 @@ class LL_NextLevelDB_Client extends Evented_Class {
                 // empty record...
 
                 if (res_binary_message.length === 0) {
-                    console.log('ll_get_record res_binary_message', res_binary_message);
+                    //console.log('ll_get_record res_binary_message', res_binary_message);
                     callback(null, undefined);
                 } else {
-                    console.log('ll_get_record res_binary_message', res_binary_message);
+                    //console.log('ll_get_record res_binary_message', res_binary_message);
                     callback(null, res_binary_message);
                 }
 
@@ -2319,7 +2319,7 @@ class LL_NextLevelDB_Client extends Evented_Class {
     }
 
     'get_table_id_by_name' (table_name, callback) {
-        console.log('get_table_id_by_name table_name', table_name);
+        //console.log('get_table_id_by_name table_name', table_name);
         let inner = (icb) => {
             let buf_encoded = Binary_Encoding.flexi_encode_item(table_name);
             var buf_query = Buffer.concat([xas2(TABLE_ID_BY_NAME).buffer, buf_encoded]);
@@ -2327,7 +2327,7 @@ class LL_NextLevelDB_Client extends Evented_Class {
                 if (err) {
                     icb(err);
                 } else {
-                    console.log('table_id', table_id);
+                    //console.log('table_id', table_id);
                     icb(null, table_id);
                 }
             })
