@@ -4,7 +4,9 @@
 
 const http = require('http');
 const url = require('url');
-const WebSocketClient = require('websocket').client;
+
+const WebSocket = require('ws');
+
 const lang = require('lang-mini');
 const get_item_sig = lang.get_item_sig;
 const get_arr_sig = lang.get_arr_sig;
@@ -59,6 +61,13 @@ const LL_UNSUBSCRIBE_SUBSCRIPTION = 62;
 
 const LL_WIPE = 100;
 const LL_WIPE_REPLACE = 101;
+
+const LL_SEND_MESSAGE_RECEIPT = 120;
+
+
+
+//const LL_PAUSE_MESSAGE_RESPONSES = 120;
+//const LL_RESUME_MESSAGE_RESPONSES = 120;
 
 // LL_SUBSCRIBE_ALL will get callback with encoded data.
 //  Non-LL versions would decode that data.
@@ -138,6 +147,20 @@ const ERROR_MESSAGE = 10;
 
 
 
+// 26/03/2018
+//  Backpressure seems like it could be an issue. The client's receive buffer gets full quicker than it raises the message events.
+
+// Want a way to moderate this....
+//  Could have a way to moderate the backpressure.
+//  Could try reading it slower from the server.
+
+// LL_SEND_MESSAGE_RECEIPT - Whenever we receive a message on the client, we send a receipt for it over to the server.
+//  That way, there would be a way for the server to tell when it's got behind with any client's messages.
+//  When we receive paged data, then using LL_SEND_MESSAGE_RECEIPT would be useful to help the server judge if it needs to pause reading the db while send/receive catches up.
+//   The server can send much quicker than the client receives in the case I am working on.
+
+
+
 
 
 
@@ -212,6 +235,17 @@ class LL_NextLevelDB_Client extends Evented_Class {
 
         this.id_ws_req = 0;
         var ws_response_handlers = this.ws_response_handlers = {};
+        var ws_address = this.server_url || 'ws://' + this.server_address + ':' + this.server_port + '/';
+
+        var client = this.websocket_client = new WebSocket(ws_address, 'echo-protocol', {
+            'headers': {
+                'cookie': 'access_token=' + encodeURIComponent(access_token)
+            }
+        });
+
+
+        /*
+
         var client = this.websocket_client = new WebSocketClient({
             maxReceivedFrameSize: 512000000,
             maxReceivedMessageSize: 512000000,
@@ -219,6 +253,7 @@ class LL_NextLevelDB_Client extends Evented_Class {
             //assembleFragments: false,
             closeTimeout: 1000000
         });
+        */
 
         client.on('connectFailed', function (error) {
             // socket could be closed.
@@ -250,8 +285,12 @@ class LL_NextLevelDB_Client extends Evented_Class {
 
         var first_connect = true;
 
-        //console.log('pre connect');
-        client.on('connect', function (connection) {
+        let on_open = function (connection) {
+            console.log('connected');
+            console.log('connection', connection);
+            //console.log('connection', Object.keys(connection.target));
+            //throw 'stop';
+
             that.websocket_connection = connection;
             that.auto_reconnect = true;
             that.connected = true;
@@ -268,7 +307,7 @@ class LL_NextLevelDB_Client extends Evented_Class {
             // if its a reconnection, don't need to assign these things.
 
             var assign_connection_events = function () {
-                connection.on('error', function (error) {
+                client.addEventListener('error', function (error) {
                     console.log("Connection Error: " + error.toString());
                     console.log('error', error);
                     //console.log('typeof error', typeof error);
@@ -281,7 +320,7 @@ class LL_NextLevelDB_Client extends Evented_Class {
                         attempting_reconnection = false;
                     }
                 });
-                connection.on('connectFailed', function (error) {
+                client.addEventListener('connectFailed', function (error) {
                     console.log('connection failed, err', err);
 
                     // Probably in response to attempting to write to a closed stream?
@@ -294,8 +333,12 @@ class LL_NextLevelDB_Client extends Evented_Class {
                     //attempting_reconnection = false;
                     //reconnection_attempts();
                 });
-                connection.on('close', function () {
+                client.addEventListener('close', function () {
+
+
                     console.log('echo-protocol Connection Closed');
+                    //  Nice if the long response got cancelled on the server side.
+
                     // At this point its worth noticing the connection has been closed.
                     // When the connection is closed, don't try to send.
 
@@ -312,9 +355,17 @@ class LL_NextLevelDB_Client extends Evented_Class {
 
 
                 });
-                connection.on('message', function (message) {
-                    if (message.type === 'utf8') {
-                        var obj_message = JSON.parse(message.utf8Data);
+                client.addEventListener('message', function (message) {
+
+
+
+                    //console.log('message', message);
+                    //throw 'stop';
+
+                    /*
+                    if (message.type === 'utf8' || message.type === 'message') {
+                        //var obj_message = JSON.parse(message.utf8Data || message.data);
+                        var obj_message = JSON.parse(message.data);
 
                         if (is_array(obj_message)) {
                             var request_key = obj_message[0];
@@ -337,8 +388,11 @@ class LL_NextLevelDB_Client extends Evented_Class {
                             }
                         }
                     }
-                    if (message.type === 'binary') {
-                        that.receive_binary_message(message.binaryData);
+                    */
+
+                    console.log('client.bufferedAmount', client.bufferedAmount);
+                    if (message.type === 'binary' || message.type === 'message') {
+                        that.receive_binary_message(message.data || message.binaryData);
                     }
                 });
             };
@@ -348,10 +402,17 @@ class LL_NextLevelDB_Client extends Evented_Class {
             if (first_connect) {
                 callback(null, true);
             };
-        });
+        }
+
+        //console.log('pre connect');
+        //client.on('connect', on_open);
+        //client.on('open', on_open);
+        console.log('client.onopen', client.onopen);
+        client.addEventListener('open', on_open);
+
         // need the url without the protocol.
 
-        var ws_address = this.server_url || 'ws://' + this.server_address + ':' + this.server_port + '/';
+
 
 
         //client.connect(ws_address, 'echo-protocol');
@@ -364,10 +425,14 @@ class LL_NextLevelDB_Client extends Evented_Class {
         });
         */
 
+        /*
+
         client.connect(ws_address, 'echo-protocol', null, {
             'cookie': 'access_token=' + encodeURIComponent(access_token)
 
         });
+
+        */
 
     }
 
@@ -433,6 +498,8 @@ class LL_NextLevelDB_Client extends Evented_Class {
 
 
     receive_binary_message(buf_message) {
+
+        //console.log('buf_message', buf_message);
         var message_id, pos = 0,
             message_type;
         [message_id, pos] = xas2.read(buf_message, pos);
@@ -486,7 +553,7 @@ class LL_NextLevelDB_Client extends Evented_Class {
             }
 
             if (message_type === RECORD_PAGING_FLOW) {
-                console.log('RECORD_PAGING_FLOW');
+                //console.log('RECORD_PAGING_FLOW');
                 this.ws_response_handlers[message_id](buf_the_rest);
                 // could remove the response handler here
             }
@@ -551,6 +618,12 @@ class LL_NextLevelDB_Client extends Evented_Class {
     //  That could be easier to use. Maybe it could even call send_binary_message, though that would be less optimal.
 
 
+    send_message_receipt(message_id, page_number) {
+        //console.log('send_message_receipt', message_id, page_number);
+        //console.trace();
+        var buf = Buffer.concat([xas2(this.id_ws_req++).buffer, xas2(LL_SEND_MESSAGE_RECEIPT).buffer, xas2(message_id).buffer, xas2(page_number).buffer]);
+        this.websocket_client.send(buf);
+    }
 
     send_binary_message(message, message_type = BINARY_PAGING_NONE, decode = false, callback) {
 
@@ -620,7 +693,7 @@ class LL_NextLevelDB_Client extends Evented_Class {
             // Could have further code within Model that is an OO message request and response encoder and decoder.
             //  There will be a number of different options for encoding and decoding messages, and it gets a little longwinded all in liner if statement code.
 
-            //console.log('send_binary_message message_type', message_type);
+            console.log('send_binary_message message_type', message_type);
 
             // The extra complexity here will mean that 'll' functions will be able to act as normal functions, so won't need to be called 'll', and the normal functions that 
             if (message_type === BINARY_PAGING_NONE) {
@@ -945,7 +1018,9 @@ class LL_NextLevelDB_Client extends Evented_Class {
 
 
 
-        this.websocket_connection.sendBytes(buf_2);
+        //this.websocket_connection.sendBytes(buf_2);
+
+        this.websocket_client.send(buf_2);
     }
 
     // and have a decode option
@@ -970,15 +1045,19 @@ class LL_NextLevelDB_Client extends Evented_Class {
 
         // Maybe this will be the ll version that does not decode the values.
 
-        var idx = this.id_ws_req++,
+        let idx = this.id_ws_req++,
             ws_response_handlers = this.ws_response_handlers,
             pos = 0,
-            message_type, response_type_code, page_number;
+            message_type, response_type_code, page_number = 0;
 
         var buf_2 = Buffer.concat([xas2(idx).buffer, message]);
         let res = new Evented_Class();
 
+        //let send_message_receipt = this.send_message_receipt;
+
         // [message_type, pos] = xas2.read(buf_message, pos);
+        //let page_number = 0;
+
         ws_response_handlers[idx] = (obj_message) => {
             pos = 0;
             // read the paging / message type option out of the message.
@@ -1079,7 +1158,7 @@ class LL_NextLevelDB_Client extends Evented_Class {
                     let arr_decoded = Model_Database.decode_model_rows(arr_bufs_kv[0], remove_kp);
 
                     console.log('arr_decoded', arr_decoded);
-                    throw 'stop';
+                    //throw 'stop';
 
                     res.raise('next', arr_decoded);
                     res.raise('complete');
@@ -1111,6 +1190,7 @@ class LL_NextLevelDB_Client extends Evented_Class {
                     let arr_decoded = Model_Database.decode_model_rows(arr_bufs_kv, remove_kp);
 
                     res.raise('next', arr_decoded);
+                    this.send_message_receipt(idx, page_number);
                 }
                 if (message_type === RECORD_PAGING_LAST) {
                     var buf_the_rest = Buffer.alloc(obj_message.length - pos);
@@ -1129,6 +1209,7 @@ class LL_NextLevelDB_Client extends Evented_Class {
 
                     res.raise('next', arr_decoded);
                     res.raise('complete', arr_decoded);
+                    this.send_message_receipt(idx, page_number);
                 }
 
                 // KEY PAGING observe_send_binary_message
@@ -1217,16 +1298,26 @@ class LL_NextLevelDB_Client extends Evented_Class {
 
 
             } else {
+                console.log('not decoding incoming message message_type, ', message_type);
+                //console.log('buf_the_rest', buf_the_rest);
+                var buf_the_rest = Buffer.alloc(obj_message.length - pos);
+
+                //page_number = 0;
+
                 if (message_type === BINARY_PAGING_NONE) {
                     res.raise('next', buf_the_rest);
                     res.raise('complete', buf_the_rest);
+
+
                 }
                 if (message_type === BINARY_PAGING_FLOW) {
                     res.raise('next', buf_the_rest);
+                    this.send_message_receipt(idx, page_number++);
                 }
                 if (message_type === BINARY_PAGING_LAST) {
                     res.raise('next', buf_the_rest);
                     res.raise('complete');
+                    this.send_message_receipt(idx, page_number++);
                 }
 
                 if (message_type === RECORD_PAGING_NONE) {
@@ -1235,10 +1326,12 @@ class LL_NextLevelDB_Client extends Evented_Class {
                 }
                 if (message_type === RECORD_PAGING_FLOW) {
                     res.raise('next', buf_the_rest);
+                    this.send_message_receipt(idx, page_number++);
                 }
                 if (message_type === RECORD_PAGING_LAST) {
                     res.raise('next', buf_the_rest);
                     res.raise('complete');
+                    this.send_message_receipt(idx, page_number++);
                 }
             }
 
@@ -1251,7 +1344,8 @@ class LL_NextLevelDB_Client extends Evented_Class {
             //ws_response_handlers[idx] = null;
         };
 
-        this.websocket_connection.sendBytes(buf_2);
+        //this.websocket_connection.sendBytes(buf_2);
+        this.websocket_client.send(buf_2);
         return res;
 
     }
@@ -1585,7 +1679,23 @@ class LL_NextLevelDB_Client extends Evented_Class {
             paging = new Paging.None();
             callback = a[2];
 
+        } else if (sig === '[n,b,o]') {
+            //buf_key_prefix = xas2(key_prefix).buffer;
+            //decode = a[1];
+            //paging = new Paging.None();
+            //callback = a[2];
+            throw 'stop';
+        } else if (sig === '[n,o,b]') {
+            buf_key_prefix = xas2(key_prefix).buffer;
+            //decode = a[1];
+            //paging = new Paging.None();
+            //callback = a[2];
+            //throw 'stop';
         } else {
+
+
+
+
             console.trace();
             throw 'Unexpected sig to ll_get_records_by_key_prefix, sig: ' + sig;
         }
@@ -1869,6 +1979,9 @@ class LL_NextLevelDB_Client extends Evented_Class {
         } else if (sig === '[B,B,o,b,f]') {
             //paging = new Paging.None();
             //callback = a[3];
+        } else if (sig === '[B,B,o,b]') {
+            //paging = new Paging.None();
+            //callback = a[3];
         } else {
             console.log('sig', sig);
             console.trace();
@@ -1883,6 +1996,8 @@ class LL_NextLevelDB_Client extends Evented_Class {
 
         // the lengths of the buffers too...
         var buf_query = Buffer.concat([buf_command, paging.buffer, xas2(buf_l.length).buffer, buf_l, xas2(buf_u.length).buffer, buf_u]);
+
+        console.log('* decode', decode);
 
         if (callback) {
             // Do this using the callback style call.
@@ -1935,9 +2050,10 @@ class LL_NextLevelDB_Client extends Evented_Class {
 
 
             // Use the observe_send_binary_message
-            console.log('buf_query', buf_query);
+            //console.log('buf_query', buf_query);
 
-            let obs = this.observe_send_binary_message(buf_query, paging.buffer);
+            //let obs = this.observe_send_binary_message(buf_query, paging.buffer, decode);
+            let obs = this.observe_send_binary_message(buf_query, decode);
             return obs;
             //throw 'NYI';
 
@@ -2180,7 +2296,7 @@ class LL_NextLevelDB_Client extends Evented_Class {
         }
 
         let proceed = () => {
-            //console.log('table_id', table_id);
+            console.log('table_id', table_id);
 
             // Send the message
 
@@ -2211,7 +2327,8 @@ class LL_NextLevelDB_Client extends Evented_Class {
             //var buf_l = 
             // Include a paging buffer too...?
 
-            //console.log('get_table_field_info buf_query', buf_query);
+            console.log('get_table_field_info buf_query', buf_query);
+
             this.send_binary_message(buf_query, BINARY_PAGING_NONE, true, (err, table_fields_info) => {
                 if (err) {
                     callback(err);
@@ -2579,11 +2696,13 @@ class LL_NextLevelDB_Client extends Evented_Class {
             if (typeof cached === 'undefined') {
                 let buf_encoded = Binary_Encoding.flexi_encode_item(table_name);
                 var buf_query = Buffer.concat([xas2(TABLE_ID_BY_NAME).buffer, buf_encoded]);
+
+                console.log('pre table id lookup');
                 this.send_binary_message(buf_query, BINARY_PAGING_NONE, true, (err, table_id) => {
                     if (err) {
                         icb(err);
                     } else {
-                        //console.log('table_id', table_id);
+                        console.log('table_id', table_id);
                         cache[table_name] = table_id;
                         icb(null, table_id);
                     }
@@ -2644,6 +2763,7 @@ if (require.main === module) {
         //env : process.env['NODE_ENV']
         //env : process.env
     });
+    let access_token = config.nextleveldb_access.root[0];
 
     /*
     var app_config = require('my-config').init({
@@ -2659,7 +2779,7 @@ if (require.main === module) {
     // data1
     //var server_data1 = config.nextleveldb_connections.data1;
     var server_data1 = config.nextleveldb_connections.localhost;
-    let access_token = config.nextleveldb_access.root[0];
+
 
     server_data1.access_token = access_token;
 
@@ -2894,6 +3014,8 @@ if (require.main === module) {
             }
 
             let test_get_table_fields_info = () => {
+
+                console.log('test_get_table_fields_info');
 
                 // Currently not getting the types
                 //let table_name = 'bittrex market summary snapshots';

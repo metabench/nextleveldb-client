@@ -351,8 +351,8 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
                 each(res_all, (table_records, table_index) => {
 
 
-                    console.log('table_records.length', table_records.length);
-                    console.log('table_records[0]', table_records[0]);
+                    //console.log('table_records.length', table_records.length);
+                    //console.log('table_records[0]', table_records[0]);
                     //throw 'stop';
 
 
@@ -939,17 +939,19 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
         // With optional decoding too...
 
 
+        //let page_size = 8192;
 
+        let page_size = 32768;
 
         let a = arguments,
             sig = get_a_sig(a);
 
-        console.log('get_table_records sig', sig);
+        //console.log('get_table_records sig', sig);
 
         if (sig === '[s]') {
             // Record paging, size 1024
 
-            let page_size = 8192;
+
             //let page_size = 1024;
 
             paging = new Paging.Record(page_size);
@@ -957,8 +959,12 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
         } else if (sig === '[s,f]') {
             callback = a[1];
             paging = null;
+        } else if (sig === '[s,b]') {
+            //callback = a[1];
+            decode = a[1];
+            paging = new Paging.Record(page_size);
+            //paging = new Paging.None();
         } else if (sig === '[s,b,f]') {
-
             paging = null;
             decode = a[1];
             callback = a[2];
@@ -966,6 +972,9 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
             console.trace();
             throw 'Unexpected sig to get_table_records: ' + sig;
         }
+
+        console.log('decode', decode);
+
 
         //console.log('sig', sig);
         //throw 'stop';
@@ -1021,7 +1030,7 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
 
                     //throw 'stop';
 
-                    let obs = this.get_records_by_key_prefix(kp, decode, paging);
+                    let obs = this.get_records_by_key_prefix(kp, paging, decode);
                     //return obs;
                     let data_pages = [];
 
@@ -2983,11 +2992,16 @@ if (require.main === module) {
             let test_paged_get_table_records = table_name => {
                 // Would use default paging when using an observable.
 
-                let obs_table_records = lc.get_table_records(table_name);
+                // What about with no decoding.
+                //  Can not handle it client-side fast enough
+
+                let obs_table_records = lc.get_table_records(table_name, false);
 
                 obs_table_records.on('next', data => {
                     //console.log('data', data);
                     console.log('data.length', data.length);
+
+
 
                     //data_pages.push(data);
                     //obs_res.raise('next', data);
