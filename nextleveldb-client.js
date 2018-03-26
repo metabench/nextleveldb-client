@@ -11,6 +11,10 @@ let each = lang.each,
     clone = lang.clone,
     get_item_sig = lang.get_item_sig;
 
+
+const Evented_Class = lang.Evented_Class;
+const get_a_sig = lang.get_a_sig;
+
 const mapify = lang.mapify;
 
 const LL_NextlevelDB_Client = require("./ll-nextleveldb-client");
@@ -18,6 +22,8 @@ const xas2 = require("xas2");
 const Binary_Encoding = require("binary-encoding");
 const Model = require("nextleveldb-model");
 const Model_Database = Model.Database;
+
+const Paging = Model.Paging;
 
 const Array_Table = require("arr-table");
 
@@ -83,6 +89,44 @@ let remove_kp = (arr_records) => {
     return arr_records;
 }
 */
+
+
+
+// 22/03/2018
+//  Would be worth doing some syncing.
+//  Need to be able to completely copy a remote DB.
+//   Could copy the tables.
+
+// Getting a hash of all records that are in a past time period, and then copying them over, ensuring the same hash on arrival.
+
+// Need to replace the DB process which has been running for the longest.
+//  Generally the records are formatted in the same way, interface having changed a lot.
+//  Not 100% sure it will start OK.
+
+// Work on full DB copies of the data2 db to the workstation.
+
+// Remote -> workstation sync seems quite important for performance.
+
+// Getting the data objects from remote seems useful too.
+//  Storing / caching data in blocks looks very important / useful too.
+
+
+// Could see how long it takes to download fairly large data sets.
+//  Probably not all that long to read through them, but would be much quicker to send pre-made binary blobs where possible.
+
+// Syncing all results from local to machine to workstation will be very useful indeed.
+//  Then have the local workstation / server generate data sets in formats ready for analysis.
+
+
+
+
+
+
+
+
+
+
+
 
 var directory_exists = function (path, callback) {
     fs.stat(resolve(path), function (err, stat) {
@@ -765,19 +809,69 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
     //  Decoding will be managed on a lower level, as we are able to do so, based on more information being in the messages, and this can be used to decode the messages as they arrive.
 
 
+    // Likely best to remove this and only use the lower level version, expanding that one so that it's not just ll, it's the way it's done, and with a rather complicated interface.
+    //  Would have improved automatic decoding functionality within the lower level codebase.
 
-    get_records_by_key_prefix(key_prefix, callback) {
-        this.ll_get_records_by_key_prefix(key_prefix, (err, encoded_records) => {
-            if (err) {
-                callback(err);
-            } else {
-                const remove_kp = 1;
-                var res = Model_Database.decode_model_rows(encoded_records, remove_kp);
-                // While removing the key prefix.
-                callback(null, res);
-            }
-        });
+    /*
+    get_records_by_key_prefix(key_prefix, paging, callback) {
+
+        let a = arguments,
+            sig = get_a_sig(a);
+        let buf_key_prefix;
+
+        console.log('sig', sig);
+
+        if (sig === '[n,o]') {
+            buf_key_prefix = xas2(key_prefix).buffer;
+        } else if (sig === '[B,o]') {
+            buf_key_prefix = key_prefix;
+        }
+
+
+        //throw 'stop';
+
+
+
+
+        // With the key prefix as a number...
+        //  Would probably be xas encoded
+
+
+        /*
+        if (sig === '[s]') {
+            // Record paging, size 1024
+            paging = new Paging.Record(1024);
+        }
+        /* /
+
+
+
+
+
+        // Should maybe retire this function, expand ll_get_records_by_key_prefix to automatically do decoding, allow paging with an observable, still work through a callback function too.
+        //  Server-side, may need expansion to enable paging.
+
+        if (callback) {
+            this.ll_get_records_by_key_prefix(buf_key_prefix, (err, encoded_records) => {
+                if (err) {
+                    callback(err);
+                } else {
+                    const remove_kp = 1;
+                    var res = Model_Database.decode_model_rows(encoded_records, remove_kp);
+                    // While removing the key prefix.
+                    callback(null, res);
+                }
+            });
+        } else {
+            //throw 'NYI';
+
+            //let obs =
+        }
+
+
+
     }
+    */
 
     // get_decoded_records_by_key_prefix
     /**
@@ -828,7 +922,114 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
     //  More complex server-side functionality will allow yet more complex and useful queies to take place server-side.
     //  
 
-    get_table_records(table_name, callback) {
+    get_table_records(table_name, paging, callback) {
+
+
+        let a = arguments,
+            sig = get_a_sig(a);
+
+        console.log('sig', sig);
+
+        if (sig === '[s]') {
+            // Record paging, size 1024
+
+            let page_size = 8192;
+            //let page_size = 1024;
+
+            paging = new Paging.Record(page_size);
+
+        }
+
+        //console.log('sig', sig);
+        //throw 'stop';
+
+        // Paging object that is used when no callback is given.
+
+        // API will always be promise / observable when no callback is given.
+
+
+
+
+
+
+        // Making this work with paging seems useful / important.
+        //  May need to upgrade server-side too.
+        //  Carry out the updates on data
+
+        // Should run using an inner observable.
+        //  The server could have its own default paging, or we need to give default paging if we use an observable.
+
+        // Using an observable should indicate we don't want all of the records at once.
+
+
+        // get_table_kp_by_name
+
+
+        let obs_res;
+
+
+        if (!callback) {
+            // A temporary observer, because we don't have the params yet?
+
+            // Double layer observable?
+
+            obs_res = new Evented_Class();
+
+        }
+
+        this.get_table_kp_by_name(table_name, (err, kp) => {
+            if (err) {
+                callback(err);
+            } else {
+
+                // Should also use an observable version of this, though the version with the callback would also be useful.
+
+                if (callback) {
+                    this.get_records_by_key_prefix(kp, callback);
+                } else {
+                    console.log('paging', paging);
+
+                    //throw 'stop';
+
+                    let obs = this.get_records_by_key_prefix(kp, paging);
+                    //return obs;
+                    let data_pages = [];
+
+
+
+                    obs.on('next', data => {
+                        //console.log('data', data);
+                        //console.log('data.length', data.length);
+
+                        //data_pages.push(data);
+                        obs_res.raise('next', data);
+                    });
+                    obs.on('complete', data => {
+                        //console.log('data', data);
+                        //console.log('completed data.length', data.length);
+
+                        // Don't get the last data again.
+                        obs_res.raise('complete', data);
+
+
+                        //console.log('completed data (last page)', data);
+
+
+
+                        //let all_records = [].concat.apply([], data_pages);
+                        //console.log('all_records.length', all_records.length);
+                    });
+                }
+            }
+        });
+
+        if (!callback) {
+            return obs_res;
+        }
+
+
+        /*
+
         if (this.model) {
             var table = this.model.map_tables[table_name];
             if (table) {
@@ -837,17 +1038,27 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
             } else {
                 callback("Table " + table_name + " not found");
             }
+
         } else {
             //throw 'Expected this.model, otherwise can\'t find table by name'
             this.get_table_kp_by_name(table_name, (err, kp) => {
                 if (err) {
                     callback(err);
                 } else {
+
+                    // Should also use an observable version of this, though the version with the callback would also be useful.
+
+
+
+
+
                     this.get_records_by_key_prefix(kp, callback);
                 }
             });
             //callback("Expected this.model, otherwise can't find table by name");
         }
+
+        */
     }
 
 
@@ -1183,11 +1394,6 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
         // Bringing index lookups and other indexing functionality deeper into the server db makes a lot of sense.
 
 
-
-
-
-
-
         // idx_lookup(tables_table_idx_kp (3), 0, [table_name])
 
 
@@ -1324,14 +1530,7 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
                         console.log('changes', changes);
 
                     }
-
-
                 })
-
-
-
-
-
             } else {
 
 
@@ -1499,7 +1698,7 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
                 callback(err);
             } else {
 
-                console.log('table_id', table_id);
+                //console.log('table_id', table_id);
 
                 //var akp = [table_fields_id, table_id];
                 let buf = Model_Database.encode_key(table_fields_kp, [table_id]);
@@ -2669,6 +2868,17 @@ var local_xeon = {
 
 
 if (require.main === module) {
+
+    var config = require('my-config').init({
+        path: path.resolve('../../config/config.json') //,
+        //env : process.env['NODE_ENV']
+        //env : process.env
+    });
+
+    let access_token = config.nextleveldb_access.root[0];
+    console.log('access_token', access_token);
+    local_info.access_token = access_token;
+
     var lc = new NextlevelDB_Client(local_info);
 
     // Looks like the level client keeps itself open.
@@ -2676,6 +2886,7 @@ if (require.main === module) {
 
     lc.start((err, res_start) => {
         if (err) {
+            console.trace();
             throw err;
         } else {
             // count_each_table_records_up_to
@@ -2736,7 +2947,39 @@ if (require.main === module) {
                     // Could strip the table kp.
                 })
             }
-            test_table_subscription('bittrex market summary snapshots');
+            //test_table_subscription('bittrex market summary snapshots');
+
+
+            let test_paged_get_table_records = table_name => {
+                // Would use default paging when using an observable.
+
+                let obs_table_records = lc.get_table_records(table_name);
+
+                obs_table_records.on('next', data => {
+                    //console.log('data', data);
+                    console.log('data.length', data.length);
+
+                    //data_pages.push(data);
+                    //obs_res.raise('next', data);
+                });
+                obs_table_records.on('complete', data => {
+                    //console.log('data', data);
+                    console.log('completed data.length', data.length);
+
+                    // Don't get the last data again.
+                    //obs_res.raise('complete', data);
+
+
+                    //console.log('completed data (last page)', data);
+
+
+
+                    //let all_records = [].concat.apply([], data_pages);
+                    //console.log('all_records.length', all_records.length);
+                });
+
+            }
+            test_paged_get_table_records('bittrex market summary snapshots');
 
         }
     });
