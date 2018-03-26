@@ -342,15 +342,27 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
     load_tables(arr_table_names, callback) {
         var fns = Fns();
         each(arr_table_names, table_name => {
-            fns.push([this, this.get_table_records, [table_name]]);
+            fns.push([this, this.get_table_records, [table_name, true]]);
         });
         fns.go((err, res_all) => {
             if (err) {
                 callback(err);
             } else {
                 each(res_all, (table_records, table_index) => {
+
+
+                    console.log('table_records.length', table_records.length);
+                    console.log('table_records[0]', table_records[0]);
+                    //throw 'stop';
+
+
                     var table_name = arr_table_names[table_index];
                     var table = this.model.map_tables[table_name];
+
+                    // These records should have been decoded by now.
+
+                    //console.log('table_records', table_records);
+                    //throw 'stop';
                     table.add_records(table_records);
                 });
                 callback(null, this.model);
@@ -922,13 +934,17 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
     //  More complex server-side functionality will allow yet more complex and useful queies to take place server-side.
     //  
 
-    get_table_records(table_name, paging, callback) {
+    get_table_records(table_name, paging, decode = true, callback) {
+
+        // With optional decoding too...
+
+
 
 
         let a = arguments,
             sig = get_a_sig(a);
 
-        console.log('sig', sig);
+        console.log('get_table_records sig', sig);
 
         if (sig === '[s]') {
             // Record paging, size 1024
@@ -938,6 +954,17 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
 
             paging = new Paging.Record(page_size);
 
+        } else if (sig === '[s,f]') {
+            callback = a[1];
+            paging = null;
+        } else if (sig === '[s,b,f]') {
+
+            paging = null;
+            decode = a[1];
+            callback = a[2];
+        } else {
+            console.trace();
+            throw 'Unexpected sig to get_table_records: ' + sig;
         }
 
         //console.log('sig', sig);
@@ -985,13 +1012,16 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
                 // Should also use an observable version of this, though the version with the callback would also be useful.
 
                 if (callback) {
-                    this.get_records_by_key_prefix(kp, callback);
+
+                    // Remove table kps from records when decoding.
+                    this.get_records_by_key_prefix(kp, decode, callback);
+
                 } else {
                     console.log('paging', paging);
 
                     //throw 'stop';
 
-                    let obs = this.get_records_by_key_prefix(kp, paging);
+                    let obs = this.get_records_by_key_prefix(kp, decode, paging);
                     //return obs;
                     let data_pages = [];
 

@@ -599,6 +599,7 @@ class LL_NextLevelDB_Client extends Evented_Class {
         //  Inefficient in some ways when we know it's not needed.
         //  Many functions can handle paging though, and I think it's quite a priority in terms of replication and having the dbs able to talk to each other.
 
+        console.log('return_message_type', return_message_type);
         if (return_message_type) {
             // may be possible for this to return an observable.
             //  Sometimes it will be called with a callback, but not always.
@@ -763,8 +764,8 @@ class LL_NextLevelDB_Client extends Evented_Class {
                         //let decoded = Binary_Encoding.decode(buf_the_rest);
 
                         var row_buffers = Binary_Encoding.get_row_buffers(buf_the_rest);
-
-                        let decoded = Model_Database.decode_model_rows(row_buffers);
+                        let decoded = Model_Database.decode_model_rows(row_buffers, 1);
+                        // To remove a single key prefix here.
                         //console.log('decoded', decoded);
 
                         callback(null, decoded);
@@ -1543,7 +1544,7 @@ class LL_NextLevelDB_Client extends Evented_Class {
     //  
 
 
-    ll_get_records_by_key_prefix(key_prefix, paging, callback) {
+    ll_get_records_by_key_prefix(key_prefix, paging, decode = false, callback) {
 
         // Should probably use a sig test in the client.
         //  Maybe will want decoding in the client too.
@@ -1561,13 +1562,32 @@ class LL_NextLevelDB_Client extends Evented_Class {
             sig = get_a_sig(a);
         let buf_key_prefix;
 
-        console.log('sig', sig);
+        console.log('ll_get_records_by_key_prefix sig', sig);
 
         if (sig === '[n,o]') {
             buf_key_prefix = xas2(key_prefix).buffer;
 
+        } else if (sig === '[n,f]') {
+            buf_key_prefix = xas2(key_prefix).buffer;
+            paging = new Paging.None();
+            callback = a[1];
         } else if (sig === '[B,o]') {
             buf_key_prefix = key_prefix;
+        } else if (sig === '[B,f]') {
+            buf_key_prefix = key_prefix;
+            callback = a[1];
+            paging = new Paging.None();
+
+            // [n,b,f]
+        } else if (sig === '[n,b,f]') {
+            buf_key_prefix = xas2(key_prefix).buffer;
+            decode = a[1];
+            paging = new Paging.None();
+            callback = a[2];
+
+        } else {
+            console.trace();
+            throw 'Unexpected sig to ll_get_records_by_key_prefix, sig: ' + sig;
         }
 
         //throw 'stop';
@@ -1583,9 +1603,9 @@ class LL_NextLevelDB_Client extends Evented_Class {
         var buf_u = Buffer.concat([buf_key_prefix, buf_1]);
 
         if (callback) {
-            this.ll_get_records_in_range(buf_l, buf_u, paging, callback);
+            this.ll_get_records_in_range(buf_l, buf_u, paging, decode, callback);
         } else {
-            return this.ll_get_records_in_range(buf_l, buf_u, paging);
+            return this.ll_get_records_in_range(buf_l, buf_u, paging, decode);
         }
 
 
@@ -1809,9 +1829,12 @@ class LL_NextLevelDB_Client extends Evented_Class {
 
 
 
+    // decode option too...
 
+    // decoding option of removing table key prefixes.
+    //  
 
-    ll_get_records_in_range(buf_l, buf_u, paging, callback) {
+    ll_get_records_in_range(buf_l, buf_u, paging, decode = false, callback) {
         // 
         // Could have paging and observable options here in this function.
         //  Basically need to implement them all over the place in a flexible way.
@@ -1824,7 +1847,7 @@ class LL_NextLevelDB_Client extends Evented_Class {
         //  Could also say a limit to how many records to retrieve.
 
 
-
+        //let decode = true;
 
 
         let a = arguments,
@@ -1832,10 +1855,20 @@ class LL_NextLevelDB_Client extends Evented_Class {
 
         console.log('ll_get_records_in_range sig', sig);
 
+        // Possibly there will be a decode option too.
+
+
         if (sig === '[B,B,f]') {
             paging = new Paging.None();
+            callback = a[2];
         } else if (sig === '[B,B,o]') {
             //paging = new Paging.None();
+        } else if (sig === '[B,B,o,f]') {
+            //paging = new Paging.None();
+            callback = a[3];
+        } else if (sig === '[B,B,o,b,f]') {
+            //paging = new Paging.None();
+            //callback = a[3];
         } else {
             console.log('sig', sig);
             console.trace();
@@ -1872,7 +1905,9 @@ class LL_NextLevelDB_Client extends Evented_Class {
 
             // Do it this way if we are not using an observable
 
-            this.send_binary_message(buf_query, RECORD_PAGING_NONE, (err, res_binary_message) => {
+            console.log('pre this.send_binary_message, with cb', buf_query);
+
+            this.send_binary_message(buf_query, RECORD_PAGING_NONE, decode, (err, res_binary_message) => {
                 if (err) {
                     callback(err);
                 } else {
@@ -1881,8 +1916,17 @@ class LL_NextLevelDB_Client extends Evented_Class {
 
                     //console.log('res_binary_message', res_binary_message);
 
-                    var arr_kv_buffers = Binary_Encoding.split_length_item_encoded_buffer_to_kv(res_binary_message);
-                    callback(null, arr_kv_buffers);
+                    //var arr_kv_buffers = Binary_Encoding.split_length_item_encoded_buffer_to_kv(res_binary_message);
+                    //console.log('arr_kv_buffers', arr_kv_buffers);
+
+                    // Get used to decoding / splitting this buffer at a later stage?
+
+                    console.log('decode', decode);
+
+                    console.log('res_binary_message', res_binary_message);
+                    //throw 'stop';
+
+                    callback(null, res_binary_message);
                 }
             });
 
@@ -2525,7 +2569,7 @@ class LL_NextLevelDB_Client extends Evented_Class {
     //  The cache could be deleted / invalidated at some points in time.
 
     'get_table_id_by_name' (table_name, callback) {
-        //console.log('get_table_id_by_name table_name', table_name);
+        console.log('get_table_id_by_name table_name', table_name);
 
         let cache = this.table_id_by_name_cache = this.table_id_by_name_cache || {};
         let cached;
