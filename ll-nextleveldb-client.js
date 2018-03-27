@@ -1113,14 +1113,18 @@ class LL_NextLevelDB_Client extends Evented_Class {
                 }
                 if (message_type === BINARY_PAGING_FLOW) {
 
+                    [page_number, pos] = xas2.read(obj_message, pos);
+
 
                     var buf_the_rest = Buffer.alloc(obj_message.length - pos);
                     obj_message.copy(buf_the_rest, 0, pos);
 
                     let decoded = Binary_Encoding.decode_buffer(buf_the_rest)[0];
                     res.raise('next', decoded);
+                    this.send_message_receipt(idx, page_number);
                 }
                 if (message_type === BINARY_PAGING_LAST) {
+                    [page_number, pos] = xas2.read(obj_message, pos);
                     var buf_the_rest = Buffer.alloc(obj_message.length - pos);
                     obj_message.copy(buf_the_rest, 0, pos);
 
@@ -1129,6 +1133,7 @@ class LL_NextLevelDB_Client extends Evented_Class {
 
                     res.raise('next', decoded);
                     res.raise('complete', decoded);
+                    this.send_message_receipt(idx, page_number);
                 }
 
                 // KEY_PAGING_NONE
@@ -1174,7 +1179,7 @@ class LL_NextLevelDB_Client extends Evented_Class {
                     let remove_kp = true;
                     let arr_decoded = Model_Database.decode_model_rows(arr_bufs_kv[0], remove_kp);
 
-                    console.log('arr_decoded', arr_decoded);
+                    //console.log('arr_decoded', arr_decoded);
                     //throw 'stop';
 
                     res.raise('next', arr_decoded);
@@ -1260,7 +1265,7 @@ class LL_NextLevelDB_Client extends Evented_Class {
                     console.log('KEY_PAGING_FLOW');
 
                     var buf_the_rest = Buffer.alloc(obj_message.length - pos);
-                    console.log('buf_the_rest', buf_the_rest);
+                    //console.log('buf_the_rest', buf_the_rest);
                     obj_message.copy(buf_the_rest, 0, pos);
                     pos = 0;
                     //console.log('buf_the_rest', buf_the_rest);
@@ -1296,6 +1301,8 @@ class LL_NextLevelDB_Client extends Evented_Class {
                     let arr_decoded = Model_Database.decode_keys(arr_bufs_keys, remove_kp);
 
                     res.raise('next', arr_decoded);
+                    //console.log('idx, page_number', idx, page_number);
+                    this.send_message_receipt(idx, page_number);
                 }
                 if (message_type === KEY_PAGING_LAST) {
                     var buf_the_rest = Buffer.alloc(obj_message.length - pos);
@@ -1311,6 +1318,7 @@ class LL_NextLevelDB_Client extends Evented_Class {
 
                     res.raise('next', arr_decoded);
                     res.raise('complete');
+                    this.send_message_receipt(idx, page_number);
                 }
 
 
