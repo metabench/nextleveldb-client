@@ -32,6 +32,18 @@ const resolve = path.resolve;
 
 const Table_Subscription = require('./table-subscription');
 
+const obs_throughput = (obs_res, obs_inner) => {
+    obs_inner.on('next', data => {
+        obs_res.raise('next', data);
+    });
+    obs_inner.on('error', err => {
+        obs_res.raise('error', err);
+    });
+    obs_inner.on('complete', data => {
+        obs_res.raise('complete', data);
+    });
+}
+
 // A more advanced client would definitely help.
 //  Client will be used for db replication and distribution as well.
 //  The server will have a client of its own to connect to other servers.
@@ -705,18 +717,26 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
         var buf_l = Buffer.concat([buf_kp, buf_0]);
         var buf_u = Buffer.concat([buf_kp, buf_1]);
 
-        this.ll_count_keys_in_range(buf_l, buf_u, (err, res_count) => {
-            if (err) {
-                throw err;
-            } else {
-                //console.log('res_count', res_count);
 
-                callback(null, res_count);
+        if (callback) {
+            this.ll_count_keys_in_range(buf_l, buf_u, (err, res_count) => {
+                if (err) {
+                    throw err;
+                } else {
+                    //console.log('res_count', res_count);
 
-                //
-                //throw 'stop';
-            }
-        });
+                    callback(null, res_count);
+
+                    //
+                    //throw 'stop';
+                }
+            });
+        } else {
+            return this.ll_count_keys_in_range(buf_l, buf_u);
+        }
+
+
+
     }
 
     // count_records_by_key_prefix_up_to
@@ -2247,6 +2267,44 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
      * @memberof NextlevelDB_Client
      */
     count_table_records(table_name, callback) {
+
+        // use a get table id promise
+
+        //let prom_table_id = get_table_id_by_name(table_name);
+        //prom_table_id.then(table_id)
+
+        let obs_res = new Evented_Class();
+
+        this.get_table_id_by_name(table_name).then(table_id => {
+            let kp = table_id * 2 + 2;
+
+            //this.count_records_by_key_prefix(kp, callback);
+            let obs_count_records = this.count_records_by_key_prefix(kp);
+
+            let t_obs_count_records = tof(obs_count_records);
+            //console.log('t_obs_count_records', t_obs_count_records);
+
+            // Would help to detect an Evented Class or Observable.
+
+
+
+            // Pass it an O observable or E evented class?
+            //  Detecting Observables and Promises in tof would be useful.
+
+            // That way we could pass one observable returning function another observable to send results to, rather than a callback.
+
+
+
+            obs_throughput(obs_res, obs_count_records);
+
+
+        });
+
+
+        return obs_res;
+
+        /*
+
         if (this.model) {
             var table = this.model.map_tables[table_name];
             if (table) {
@@ -2261,16 +2319,23 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
             //  Will make more advanced functionality that does not require having the model loaded on the client - but making use of the client-side model will be available for some more complex features, as well as a
             //  way to guarantee consistency.
 
-            this.get_table_id_by_name(table_name, (err, table_id) => {
-                if (err) {
-                    callback(err);
-                } else {
-                    let kp = table_id * 2 + 2;
-                    this.count_records_by_key_prefix(kp, callback);
+            if (callback) {
+                this.get_table_id_by_name(table_name, (err, table_id) => {
+                    if (err) {
+                        callback(err);
+                    } else {
+                        let kp = table_id * 2 + 2;
+                        this.count_records_by_key_prefix(kp, callback);
+    
+                    }
+                });
+            } else {
 
-                }
-            });
+            }
+
+            
         }
+        */
     }
 
     count_table_records_up_to(table_name, limit, callback) {

@@ -159,6 +159,21 @@ const ERROR_MESSAGE = 10;
 //  When we receive paged data, then using LL_SEND_MESSAGE_RECEIPT would be useful to help the server judge if it needs to pause reading the db while send/receive catches up.
 //   The server can send much quicker than the client receives in the case I am working on.
 
+// Backpressure has been solved
+
+// 27/03/2018
+//  Data being sent is quite big, so usage of compression would make sense.
+//   Currently it can be sent at a decent rate at least, and WebSocket buffer problem has been solved, but not implemented everywhere.
+
+//  Table and data syncing looks like a pressing thing to solve. Protocol looks OK for the moment, but could benefit from compression (LZ4) in various places, or other compression options.
+//   Limit option could also go in the protocol, so require fewer ll functions, and make for better DRY code.
+
+// Maybe this would take a few hours to sync a few weeks' of data.
+//  Getting every thousand or million sampled keys from a range would help.
+//   Or according to the page sizes. Percentage complete statistic of a download would greatly help, with 1 decimal place. So out of 1000.
+
+// Just a count in range would be useful to start with.
+// count_table_records sometimes would do.
 
 
 
@@ -390,7 +405,7 @@ class LL_NextLevelDB_Client extends Evented_Class {
                     }
                     */
 
-                    console.log('client.bufferedAmount', client.bufferedAmount);
+                    //console.log('client.bufferedAmount', client.bufferedAmount);
                     if (message.type === 'binary' || message.type === 'message') {
                         that.receive_binary_message(message.data || message.binaryData);
                     }
@@ -407,7 +422,7 @@ class LL_NextLevelDB_Client extends Evented_Class {
         //console.log('pre connect');
         //client.on('connect', on_open);
         //client.on('open', on_open);
-        console.log('client.onopen', client.onopen);
+        //console.log('client.onopen', client.onopen);
         client.addEventListener('open', on_open);
 
         // need the url without the protocol.
@@ -1097,6 +1112,8 @@ class LL_NextLevelDB_Client extends Evented_Class {
                     res.raise('complete', decoded);
                 }
                 if (message_type === BINARY_PAGING_FLOW) {
+
+
                     var buf_the_rest = Buffer.alloc(obj_message.length - pos);
                     obj_message.copy(buf_the_rest, 0, pos);
 
@@ -1241,7 +1258,9 @@ class LL_NextLevelDB_Client extends Evented_Class {
                 }
                 if (message_type === KEY_PAGING_FLOW) {
                     console.log('KEY_PAGING_FLOW');
+
                     var buf_the_rest = Buffer.alloc(obj_message.length - pos);
+                    console.log('buf_the_rest', buf_the_rest);
                     obj_message.copy(buf_the_rest, 0, pos);
                     pos = 0;
                     //console.log('buf_the_rest', buf_the_rest);
@@ -2194,7 +2213,15 @@ class LL_NextLevelDB_Client extends Evented_Class {
      * @memberof LL_NextLevelDB_Client
      */
     ll_count_keys_in_range(buf_l, buf_u, callback) {
-        var paging = new Paging.None();
+        var paging;
+
+        if (callback) {
+            paging = new Paging.None();
+        } else {
+            paging = new Paging.Timed(1000);
+        }
+
+
         var buf_command = xas2(LL_COUNT_KEYS_IN_RANGE).buffer;
         // the lengths of the buffers too...
         var buf_query = Buffer.concat([buf_command, paging.buffer, xas2(buf_l.length).buffer, buf_l, xas2(buf_u.length).buffer, buf_u]);
@@ -2202,15 +2229,22 @@ class LL_NextLevelDB_Client extends Evented_Class {
         // Include a paging buffer too...?
 
         //console.log('buf_query', buf_query);
-        this.send_binary_message(buf_query, (err, res_binary_message) => {
-            if (err) {
-                callback(err);
-            } else {
-                var count, pos;
-                [count, pos] = xas2.read(res_binary_message, 0);
-                callback(null, count);
-            }
-        });
+
+        if (callback) {
+            this.send_binary_message(buf_query, (err, res_binary_message) => {
+                if (err) {
+                    callback(err);
+                } else {
+                    var count, pos;
+                    [count, pos] = xas2.read(res_binary_message, 0);
+                    callback(null, count);
+                }
+            });
+        } else {
+            return this.observe_send_binary_message(buf_query, true);
+        }
+
+
     }
 
     // LL_COUNT_KEYS_IN_RANGE_UP_TO
