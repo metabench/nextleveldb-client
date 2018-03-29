@@ -1259,7 +1259,7 @@ class LL_NextLevelDB_Client extends Evented_Class {
                     //throw 'stop';
 
                     res.raise('next', arr_decoded);
-                    res.raise('complete');
+                    res.raise('complete', arr_decoded);
                 }
                 if (message_type === KEY_PAGING_FLOW) {
                     console.log('KEY_PAGING_FLOW');
@@ -1317,7 +1317,7 @@ class LL_NextLevelDB_Client extends Evented_Class {
                     let arr_decoded = Model_Database.decode_keys(arr_bufs_k, remove_kp);
 
                     res.raise('next', arr_decoded);
-                    res.raise('complete');
+                    res.raise('complete', arr_decoded);
                     this.send_message_receipt(idx, page_number);
                 }
 
@@ -1744,9 +1744,6 @@ class LL_NextLevelDB_Client extends Evented_Class {
         } else {
             return this.ll_get_records_in_range(buf_l, buf_u, paging, decode);
         }
-
-
-
     }
 
     ll_get_records_by_key_prefix_up_to(key_prefix, limit, callback) {
@@ -1793,6 +1790,10 @@ class LL_NextLevelDB_Client extends Evented_Class {
      * @param {any} callback 
      * @memberof LL_NextLevelDB_Client
      */
+
+    // This will be expanded, like get_records_by_key_prefix
+
+    /*
     ll_get_keys_by_key_prefix(key_prefix, callback) {
         var buf_kp = xas2(key_prefix).buffer;
         var buf_0 = Buffer.alloc(1);
@@ -1806,6 +1807,96 @@ class LL_NextLevelDB_Client extends Evented_Class {
 
         this.ll_get_keys_in_range(buf_l, buf_u, callback);
     }
+    */
+
+
+
+    ll_get_keys_by_key_prefix(key_prefix, paging, decode = false, callback) {
+
+        // Should probably use a sig test in the client.
+        //  Maybe will want decoding in the client too.
+        //console.log('ll_get_records_by_key_prefix');
+
+
+        // Expand this, and ll_get_records_in_range, so that they return an observable if no callback function is provided.
+        //  Would have a default paging option (or use the server default).
+
+        // Should call ll_get_records_in_range using an observable.
+
+        // An inner observable would be a reasonable style here.
+
+        let a = arguments,
+            sig = get_a_sig(a);
+        let buf_key_prefix;
+
+        console.log('ll_get_records_by_key_prefix sig', sig);
+
+        if (sig === '[n,o]') {
+            buf_key_prefix = xas2(key_prefix).buffer;
+
+        } else if (sig === '[n,f]') {
+            buf_key_prefix = xas2(key_prefix).buffer;
+            paging = new Paging.None();
+            callback = a[1];
+        } else if (sig === '[B,o]') {
+            buf_key_prefix = key_prefix;
+        } else if (sig === '[B,f]') {
+            buf_key_prefix = key_prefix;
+            callback = a[1];
+            paging = new Paging.None();
+
+            // [n,b,f]
+        } else if (sig === '[n,b,f]') {
+            buf_key_prefix = xas2(key_prefix).buffer;
+            decode = a[1];
+            paging = new Paging.None();
+            callback = a[2];
+
+        } else if (sig === '[n,b,o]') {
+            //buf_key_prefix = xas2(key_prefix).buffer;
+            //decode = a[1];
+            //paging = new Paging.None();
+            //callback = a[2];
+            throw 'stop';
+        } else if (sig === '[n,o,b]') {
+            buf_key_prefix = xas2(key_prefix).buffer;
+            //decode = a[1];
+            //paging = new Paging.None();
+            //callback = a[2];
+            //throw 'stop';
+        } else {
+
+
+
+
+            console.trace();
+            throw 'Unexpected sig to ll_get_keys_by_key_prefix, sig: ' + sig;
+        }
+
+        //throw 'stop';
+
+        //var buf_kp = xas2(key_prefix).buffer;
+        var buf_0 = Buffer.alloc(1);
+        buf_0.writeUInt8(0, 0);
+        var buf_1 = Buffer.alloc(1);
+        buf_1.writeUInt8(255, 0);
+        // and another 0 byte...?
+
+        var buf_l = Buffer.concat([buf_key_prefix, buf_0]);
+        var buf_u = Buffer.concat([buf_key_prefix, buf_1]);
+
+        if (callback) {
+            this.ll_get_keys_in_range(buf_l, buf_u, paging, decode, callback);
+        } else {
+            return this.ll_get_keys_in_range(buf_l, buf_u, paging, decode);
+        }
+
+
+
+    }
+
+
+
 
     // get keys in range
     //  higher level version would decode the results using Model_DB.deocde_keys
@@ -1819,7 +1910,7 @@ class LL_NextLevelDB_Client extends Evented_Class {
      * @param {any} callback 
      * @memberof LL_NextLevelDB_Client
      */
-    ll_get_keys_in_range(buf_l, buf_u, callback) {
+    ll_get_keys_in_range(buf_l, buf_u, paging, decode = false, callback) {
 
         let a = arguments;
         let sig = get_a_sig(a);
@@ -1852,6 +1943,7 @@ class LL_NextLevelDB_Client extends Evented_Class {
             var paging = new Paging.None();
             var buf_command = xas2(LL_GET_KEYS_IN_RANGE).buffer;
             var buf_query = Buffer.concat([buf_command, paging.buffer, xas2(buf_l.length).buffer, buf_l, xas2(buf_u.length).buffer, buf_u]);
+            callback = a[2];
 
 
             this.send_binary_message(buf_query, (err, res_binary_message) => {
@@ -1865,8 +1957,19 @@ class LL_NextLevelDB_Client extends Evented_Class {
 
 
 
+        } else if (sig === '[B,B,o,b]') {
+            var buf_command = xas2(LL_GET_KEYS_IN_RANGE).buffer;
+            var buf_query = Buffer.concat([buf_command, paging.buffer, xas2(buf_l.length).buffer, buf_l, xas2(buf_u.length).buffer, buf_u]);
+
+            let obs = this.observe_send_binary_message(buf_query, decode);
+            return obs;
+
+
+
         } else {
             console.log('sig', sig);
+
+            console.log('a', a);
             throw 'NYI';
         }
 
@@ -2780,6 +2883,7 @@ class LL_NextLevelDB_Client extends Evented_Class {
 let p = LL_NextLevelDB_Client.prototype;
 
 p.get_records_by_key_prefix = p.ll_get_records_by_key_prefix;
+p.get_keys_by_key_prefix = p.ll_get_keys_by_key_prefix;
 
 // Will get rid of these streaming followthrough functions.
 //  It's standard for some things, and there will be a Query object with paging options too.

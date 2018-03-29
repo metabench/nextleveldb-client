@@ -2210,14 +2210,84 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
         });
     }
 
+
+    // New version...
+
+    get_table_keys(table_name, paging, decode = true, callback) {
+
+        // With optional decoding too...
+
+
+        //let page_size = 8192;
+
+        let page_size = 32768;
+
+        let a = arguments,
+            sig = get_a_sig(a);
+
+        //console.log('get_table_records sig', sig);
+
+        if (sig === '[s]') {
+            paging = new Paging.Key(page_size);
+        } else if (sig === '[s,f]') {
+            callback = a[1];
+            paging = null;
+        } else if (sig === '[s,b]') {
+            //callback = a[1];
+            decode = a[1];
+            paging = new Paging.Key(page_size);
+            //paging = new Paging.None();
+        } else if (sig === '[s,b,f]') {
+            paging = null;
+            decode = a[1];
+            callback = a[2];
+        } else {
+            console.trace();
+            throw 'Unexpected sig to get_table_records: ' + sig;
+        }
+
+        let obs_res;
+        if (!callback) {
+            obs_res = new Evented_Class();
+        }
+        this.get_table_kp_by_name(table_name, (err, kp) => {
+            if (err) {
+                callback(err);
+            } else {
+                // Should also use an observable version of this, though the version with the callback would also be useful.
+                if (callback) {
+                    // Remove table kps from records when decoding.
+                    this.get_keys_by_key_prefix(kp, decode, callback);
+                } else {
+                    //console.log('paging', paging);
+                    let obs = this.get_keys_by_key_prefix(kp, paging, decode);
+                    let data_pages = [];
+                    obs.on('next', data => {
+                        obs_res.raise('next', data);
+                    });
+                    obs.on('complete', data => {
+                        obs_res.raise('complete', data);
+                    });
+                }
+            }
+        });
+        if (!callback) {
+            return obs_res;
+        }
+    }
+
+    // Should probably retire this and upgrade the ll version, which will do decoding by default
+    /*
     /**
      *
      *
      * @param {any} table_name
      * @param {any} callback
      * @memberof NextlevelDB_Client
-     */
+     * /
     get_table_keys(table_name, callback) {
+
+
         if (this.model) {
             var table = this.model.map_tables[table_name];
             if (table) {
@@ -2231,6 +2301,7 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
             callback("Expected this.model, otherwise can't find table by name");
         }
     }
+    */
 
     /**
      *
@@ -2981,9 +3052,10 @@ if (require.main === module) {
 
     let access_token = config.nextleveldb_access.root[0];
     console.log('access_token', access_token);
-    local_info.access_token = access_token;
+    var server_data3 = config.nextleveldb_connections.data3;
+    server_data3.access_token = access_token;
 
-    var lc = new NextlevelDB_Client(local_info);
+    var lc = new NextlevelDB_Client(server_data3);
 
     // Looks like the level client keeps itself open.
     //  console.log('pre start');
@@ -3088,7 +3160,25 @@ if (require.main === module) {
                 });
 
             }
-            test_paged_get_table_records('bittrex market summary snapshots');
+            //test_paged_get_table_records('bittrex market summary snapshots');
+
+            let test_paged_get_table_keys = table_name => {
+
+                let obs_table_records = lc.get_table_keys(table_name, true);
+
+                // Auto data amalgamation, or use the observable as a stream.
+
+                obs_table_records.on('next', data => {
+                    console.log('data', data);
+                    console.log('data.length', data.length);
+                });
+                obs_table_records.on('complete', last_data => {
+                    //console.log('data', data);
+                    console.log('completed last_data.length', last_data.length);
+                });
+
+            }
+            test_paged_get_table_keys('bittrex market summary snapshots');
 
         }
     });
