@@ -283,7 +283,9 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
                 callback(err);
             } else {
                 //console.log('buf_core', buf_core);
-                that.model = Model_Database.load(buf_core);
+
+                //throw 'stop';
+                that.model = Model_Database.load_buf(buf_core);
                 callback(null, that.model);
             }
         });
@@ -2598,18 +2600,40 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
         })
     }
 
+
+    // Incrementors make putting data a lot more difficult, because 
+
     put_model_record(model_record, callback) {
-        let bufs = model_record.to_arr_buffer_with_indexes();
+
+        // This has a problem where it ignores the incrementors.
+        //  Don't think incrementation should be here.
+        //  Need to update incrementor values in some cases though.
+
+        // and the pk incrementor record if there is one.
+
+        let bufs;
+
+        /*
+        if (model_record.table.pk_incrementor) {
+            // get that incrementor row.
+
+            let inc_bin = model_record.table.pk_incrementor.get_record_bin();
+
+            bufs = Buffer.concat([inc_bin, model_record.to_arr_buffer_with_indexes()]);
+        } else {
+            bufs = model_record.to_arr_buffer_with_indexes();
+        }
+        */
+
+        bufs = model_record.to_arr_buffer_with_indexes();
         //let buf = model_record.to_buffer_with_indexes();
 
-        console.log('bufs', bufs);
+
+
+        //console.log('bufs', bufs);
         //console.log('model_record', model_record);
 
-        function flatten(arr) {
-            return arr.reduce(function (flat, toFlatten) {
-                return flat.concat(Array.isArray(toFlatten) ? flatten(toFlatten) : toFlatten);
-            }, []);
-        }
+
 
 
         //let row_buffers = Binary_Encoding.get_row_buffers(buf);
@@ -2622,7 +2646,14 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
         //console.log('buf2.length', buf2.length);
 
         // Think we need to encode these differently.
-        let buf3 = Model_Database.encode_model_rows(bufs);
+        let buf3;
+        if (model_record.table.pk_incrementor) {
+            //console.log('[Model_Database.encode_model_rows(bufs), model_record.table.pk_incrementor.get_record_bin()]', [Model_Database.encode_model_rows(bufs), Model_Database.encode_model_rows(model_record.table.pk_incrementor.get_record_bin())]);
+            buf3 = Buffer.concat([Model_Database.encode_model_rows(bufs), Model_Database.encode_model_rows(model_record.table.pk_incrementor.get_record_bin())]);
+        } else {
+            buf3 = Model_Database.encode_model_rows(bufs);
+        }
+
 
         //console.log('buf3', buf3);
         //console.log('buf2.length', buf2.length);

@@ -302,7 +302,7 @@ class LL_NextLevelDB_Client extends Evented_Class {
 
         let on_open = function (connection) {
             console.log('connected');
-            console.log('connection', connection);
+            //console.log('connection', connection);
             //console.log('connection', Object.keys(connection.target));
             //throw 'stop';
 
@@ -1829,7 +1829,7 @@ class LL_NextLevelDB_Client extends Evented_Class {
             sig = get_a_sig(a);
         let buf_key_prefix;
 
-        console.log('ll_get_records_by_key_prefix sig', sig);
+        //console.log('ll_get_records_by_key_prefix sig', sig);
 
         if (sig === '[n,o]') {
             buf_key_prefix = xas2(key_prefix).buffer;
@@ -1890,9 +1890,6 @@ class LL_NextLevelDB_Client extends Evented_Class {
         } else {
             return this.ll_get_keys_in_range(buf_l, buf_u, paging, decode);
         }
-
-
-
     }
 
 
