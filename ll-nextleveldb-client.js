@@ -687,7 +687,7 @@ class LL_NextLevelDB_Client extends Evented_Class {
         //  Inefficient in some ways when we know it's not needed.
         //  Many functions can handle paging though, and I think it's quite a priority in terms of replication and having the dbs able to talk to each other.
 
-        console.log('return_message_type', return_message_type);
+        //console.log('return_message_type', return_message_type);
         if (return_message_type) {
             // may be possible for this to return an observable.
             //  Sometimes it will be called with a callback, but not always.
@@ -708,7 +708,7 @@ class LL_NextLevelDB_Client extends Evented_Class {
             // Could have further code within Model that is an OO message request and response encoder and decoder.
             //  There will be a number of different options for encoding and decoding messages, and it gets a little longwinded all in liner if statement code.
 
-            console.log('send_binary_message message_type', message_type);
+            //console.log('send_binary_message message_type', message_type);
 
             // The extra complexity here will mean that 'll' functions will be able to act as normal functions, so won't need to be called 'll', and the normal functions that 
             if (message_type === BINARY_PAGING_NONE) {
@@ -1683,7 +1683,7 @@ class LL_NextLevelDB_Client extends Evented_Class {
             sig = get_a_sig(a);
         let buf_key_prefix;
 
-        console.log('ll_get_records_by_key_prefix sig', sig);
+        //console.log('ll_get_records_by_key_prefix sig', sig);
 
         if (sig === '[n,o]') {
             buf_key_prefix = xas2(key_prefix).buffer;
@@ -2090,7 +2090,7 @@ class LL_NextLevelDB_Client extends Evented_Class {
         let a = arguments,
             sig = get_a_sig(a);
 
-        console.log('ll_get_records_in_range sig', sig);
+        //console.log('ll_get_records_in_range sig', sig);
 
         // Possibly there will be a decode option too.
 
@@ -2118,36 +2118,27 @@ class LL_NextLevelDB_Client extends Evented_Class {
 
 
         var buf_command = xas2(LL_GET_RECORDS_IN_RANGE).buffer;
-        console.log('buf_command', buf_command);
-        console.log('paging.buffer', paging.buffer);
+        //console.log('buf_command', buf_command);
+        //console.log('paging.buffer', paging.buffer);
 
         // the lengths of the buffers too...
         var buf_query = Buffer.concat([buf_command, paging.buffer, xas2(buf_l.length).buffer, buf_l, xas2(buf_u.length).buffer, buf_u]);
 
-        console.log('* decode', decode);
+        //console.log('* decode', decode);
 
         if (callback) {
             // Do this using the callback style call.
-
             // buffer, buffer, obj, fn
+            // buffer, buffer, callback - no paging, decode the incoming data, return it with callback=
 
-            // buffer, buffer, callback - no paging, decode the incoming data, return it with callback
-
-
-
-
-
-            //console.log('sig', sig);
-
-
-
+            // console.log('sig', sig);
 
             // What type of paging?
             //  For the moment, no paging.
 
             // Do it this way if we are not using an observable
 
-            console.log('pre this.send_binary_message, with cb', buf_query);
+            //console.log('pre this.send_binary_message, with cb', buf_query);
 
             this.send_binary_message(buf_query, RECORD_PAGING_NONE, decode, (err, res_binary_message) => {
                 if (err) {
@@ -2163,9 +2154,9 @@ class LL_NextLevelDB_Client extends Evented_Class {
 
                     // Get used to decoding / splitting this buffer at a later stage?
 
-                    console.log('decode', decode);
+                    //console.log('decode', decode);
 
-                    console.log('res_binary_message', res_binary_message);
+                    //console.log('res_binary_message', res_binary_message);
                     //throw 'stop';
 
                     callback(null, res_binary_message);

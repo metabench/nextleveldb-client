@@ -2649,7 +2649,22 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
         let buf3;
         if (model_record.table.pk_incrementor) {
             //console.log('[Model_Database.encode_model_rows(bufs), model_record.table.pk_incrementor.get_record_bin()]', [Model_Database.encode_model_rows(bufs), Model_Database.encode_model_rows(model_record.table.pk_incrementor.get_record_bin())]);
-            buf3 = Buffer.concat([Model_Database.encode_model_rows(bufs), Model_Database.encode_model_rows(model_record.table.pk_incrementor.get_record_bin())]);
+
+            //let bufs2 = Array.concat()
+
+            // This part does not seem quite right.
+
+            //console.log('bufs', bufs);
+            let inc_record_bin = model_record.table.pk_incrementor.get_record_bin();
+            //console.log('inc_record_bin', inc_record_bin);
+
+            bufs.push(inc_record_bin);
+            //throw 'stop';
+            buf3 = Model_Database.encode_model_rows(bufs);
+
+
+
+            //buf3 = Buffer.concat([Model_Database.encode_model_rows(bufs), Model_Database.encode_model_rows(model_record.table.pk_incrementor.get_record_bin())]);
         } else {
             buf3 = Model_Database.encode_model_rows(bufs);
         }
