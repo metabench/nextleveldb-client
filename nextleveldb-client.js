@@ -270,6 +270,37 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
         });
     }
 
+
+    get_table_max_key(table_name, callback) {
+        this.get_table_id_by_name(table_name, (err, table_id) => {
+            if (err) {
+                callback(err);
+            } else {
+
+                // do a get range in reverse, with limit of 1.
+                // or the last record by key prefix, 
+
+                let table_kp = table_id * 2 + 2;
+
+                // being able to specify reverse and limit in get by prefix would be great.
+
+                let reverse = true,
+                    limit = 1;
+                this.get_keys_by_key_prefix(table_kp, reverse, limit, (err, arr_keys) => {
+                    if (err) {
+                        callback(err);
+                    } else {
+                        console.log('arr_keys', arr_keys);
+                        let res = arr_keys[0];
+                        console.log('res', res);
+                        throw 'stop';
+                    }
+                })
+
+            }
+        })
+    }
+
     /**
      *
      *

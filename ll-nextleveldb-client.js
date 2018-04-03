@@ -1809,6 +1809,15 @@ class LL_NextLevelDB_Client extends Evented_Class {
     }
     */
 
+    // Paging options, decoding option
+    //  Expanding paging seems sensible, allow it to express a limit, and reverse.
+
+    // Seems like repeating paging options but with more complex options to parse looks like the right way.
+    //  Want to have some kind of flexible QueryResultsOptions, where we can give it a limit and tell it to go in reverse.
+    //  Getting the very last record in the range would help it to check the incrementors match what they should.
+    //   Want to get the last record in an efficient way, general functionality to do with limits and reverse option would help.
+
+
 
 
     ll_get_keys_by_key_prefix(key_prefix, paging, decode = false, callback) {
