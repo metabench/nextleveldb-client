@@ -271,6 +271,7 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
     }
 
 
+    // Now have function on the server to do this, but no interface
     get_table_max_key(table_name, callback) {
         this.get_table_id_by_name(table_name, (err, table_id) => {
             if (err) {
@@ -321,6 +322,19 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
             }
         });
     }
+
+    load_buf_core(callback) {
+        var that = this;
+        this.get_core((err, buf_core) => {
+            if (err) {
+                callback(err);
+            } else {
+                callback(null, buf_core);
+            }
+        });
+    }
+
+
 
     // Useful for when we change a model, and then compare the changed one with the original.
     load_2_core(callback) {
@@ -1188,7 +1202,7 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
         this.get_table_kp_by_name(table_name, (err, kp) => {
             // then encode a buffer with that kp and key
             let buf_key = Model_Database.encode_key(kp, key);
-            console.log('buf_key', buf_key);
+            //console.log('buf_key', buf_key);
 
             // then search by key (prefix)
             //  it's the beginning of the key.

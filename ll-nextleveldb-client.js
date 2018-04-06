@@ -1325,9 +1325,10 @@ class LL_NextLevelDB_Client extends Evented_Class {
 
 
             } else {
-                console.log('not decoding incoming message message_type, ', message_type);
+                //console.log('not decoding incoming message message_type, ', message_type);
                 //console.log('buf_the_rest', buf_the_rest);
                 var buf_the_rest = Buffer.alloc(obj_message.length - pos);
+                obj_message.copy(buf_the_rest, 0, pos);
 
                 //page_number = 0;
 
@@ -1357,7 +1358,7 @@ class LL_NextLevelDB_Client extends Evented_Class {
                 }
                 if (message_type === RECORD_PAGING_LAST) {
                     res.raise('next', buf_the_rest);
-                    res.raise('complete');
+                    res.raise('complete', buf_the_rest);
                     this.send_message_receipt(idx, page_number++);
                 }
             }
