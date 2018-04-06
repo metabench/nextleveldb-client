@@ -862,6 +862,10 @@ class LL_NextLevelDB_Client extends Evented_Class {
                 } else {
                     ws_response_handlers[idx] = function (obj_message) {
                         [response_type_code, pos] = xas2.read(obj_message, pos);
+
+                        // would still have the message id?
+
+
                         //console.log('PAGING_NONE obj_message', obj_message);
 
                         let buf_the_rest = Buffer.alloc(obj_message.length - pos);
@@ -881,34 +885,51 @@ class LL_NextLevelDB_Client extends Evented_Class {
             // The response handler itself could be an observable object.
 
 
+            // Need to be able to handle this without decoding
+
             if (message_type === RECORD_PAGING_FLOW) {
-                ws_response_handlers[idx] = function (obj_message, page_number) {
 
-                    console.log('PAGING_FLOW obj_message', obj_message);
+                // Has filtered out the page number already?
 
-                    // Decode it?
+                if (decode) {
+                    throw 'NYI';
+                } else {
 
+                    ws_response_handlers[idx] = function (obj_message, page_number) {
 
+                        console.log('PAGING_FLOW obj_message', obj_message);
 
-                    //let [response_type_code, pos] = xas2.read(obj_message, 0);
-                    //console.log('response_type_code', response_type_code);
+                        console.log('page_number', page_number);
 
-
-
-                    //let buf_the_rest = Buffer.alloc(obj_message.length - pos);
-                    //obj_message.copy(buf_the_rest, 0, pos);
-
-
-                    // xas2 read and copy?
-                    //  where we don't need the position, but just need the rest of the buffer.
+                        // Decode it?
 
 
-                    // Could look in the response to see what message we have, if it indicates paging.
-                    //  However, it's a binary message
 
-                    callback(null, obj_message, page_number);
-                    //ws_response_handlers[idx] = null;
-                };
+                        //let [response_type_code, pos] = xas2.read(obj_message, 0);
+                        //console.log('response_type_code', response_type_code);
+
+
+
+                        //let buf_the_rest = Buffer.alloc(obj_message.length - pos);
+                        //obj_message.copy(buf_the_rest, 0, pos);
+
+
+                        // xas2 read and copy?
+                        //  where we don't need the position, but just need the rest of the buffer.
+
+
+                        // Could look in the response to see what message we have, if it indicates paging.
+                        //  However, it's a binary message
+
+                        callback(null, obj_message, page_number);
+                        //ws_response_handlers[idx] = null;
+                    };
+
+                }
+
+                // Version of this without decoding...
+
+
                 // could remove the response handler here
             }
             if (message_type === RECORD_PAGING_LAST) {
@@ -1072,6 +1093,11 @@ class LL_NextLevelDB_Client extends Evented_Class {
 
         // [message_type, pos] = xas2.read(buf_message, pos);
         //let page_number = 0;
+
+
+        // the message will contain the message idx, the message type, and then maybe further options.
+        //
+
 
         ws_response_handlers[idx] = (obj_message) => {
             pos = 0;
@@ -1325,46 +1351,89 @@ class LL_NextLevelDB_Client extends Evented_Class {
 
 
             } else {
-                //console.log('not decoding incoming message message_type, ', message_type);
+                console.log('not decoding incoming message message_type, ', message_type);
                 //console.log('buf_the_rest', buf_the_rest);
-                var buf_the_rest = Buffer.alloc(obj_message.length - pos);
-                obj_message.copy(buf_the_rest, 0, pos);
+
+                // Though it does not decode the messages, it could trim them?
+                //  That seems more intuitive to use.
+
+
+                // keeps the message id?
+                // Keeps the response type code?
+                // Keeps the page number?
+
+
+                // Should probably read the page number in this category.
 
                 //page_number = 0;
 
                 if (message_type === BINARY_PAGING_NONE) {
+
+                    var buf_the_rest = Buffer.alloc(obj_message.length - pos);
+                    obj_message.copy(buf_the_rest, 0, pos);
+
                     res.raise('next', buf_the_rest);
                     res.raise('complete', buf_the_rest);
 
 
                 }
                 if (message_type === BINARY_PAGING_FLOW) {
+
+                    [page_number, pos] = xas2.read(obj_message, pos);
+
+                    var buf_the_rest = Buffer.alloc(obj_message.length - pos);
+                    obj_message.copy(buf_the_rest, 0, pos);
+
                     res.raise('next', buf_the_rest);
                     this.send_message_receipt(idx, page_number++);
                 }
                 if (message_type === BINARY_PAGING_LAST) {
+
+
+                    [page_number, pos] = xas2.read(obj_message, pos);
+
+                    var buf_the_rest = Buffer.alloc(obj_message.length - pos);
+                    obj_message.copy(buf_the_rest, 0, pos);
+
                     res.raise('next', buf_the_rest);
                     res.raise('complete');
                     this.send_message_receipt(idx, page_number++);
                 }
 
                 if (message_type === RECORD_PAGING_NONE) {
+
+                    var buf_the_rest = Buffer.alloc(obj_message.length - pos);
+                    obj_message.copy(buf_the_rest, 0, pos);
+
                     res.raise('next', buf_the_rest);
                     res.raise('complete');
                 }
                 if (message_type === RECORD_PAGING_FLOW) {
+
+                    [page_number, pos] = xas2.read(obj_message, pos);
+
+                    var buf_the_rest = Buffer.alloc(obj_message.length - pos);
+                    obj_message.copy(buf_the_rest, 0, pos);
+
                     res.raise('next', buf_the_rest);
                     this.send_message_receipt(idx, page_number++);
                 }
                 if (message_type === RECORD_PAGING_LAST) {
+
+                    [page_number, pos] = xas2.read(obj_message, pos);
+
+                    console.log('page_number', page_number);
+
+                    var buf_the_rest = Buffer.alloc(obj_message.length - pos);
+                    obj_message.copy(buf_the_rest, 0, pos);
+
+                    // Series of buffer pairs.
+
                     res.raise('next', buf_the_rest);
                     res.raise('complete', buf_the_rest);
                     this.send_message_receipt(idx, page_number++);
                 }
             }
-
-
-
             // Could look in the response to see what message we have, if it indicates paging.
             //  However, it's a binary message
 
