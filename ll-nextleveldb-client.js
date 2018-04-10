@@ -640,8 +640,16 @@ class LL_NextLevelDB_Client extends Evented_Class {
         this.websocket_client.send(buf);
     }
 
-    send_binary_message(message, message_type = BINARY_PAGING_NONE, decode = false, callback) {
 
+    // Option of removing the kp from the results.
+    //  another option alongside decode?
+
+    send_binary_message(message, message_type = BINARY_PAGING_NONE, decode = false, remove_kp = false, callback) {
+
+
+
+
+        //const remove_kp = false;
 
 
         // Encoding the message into a buffer would be very useful.
@@ -649,6 +657,7 @@ class LL_NextLevelDB_Client extends Evented_Class {
 
 
         let a = arguments;
+
 
         // Need to read what type of message it is when the message gets returned....
 
@@ -662,6 +671,10 @@ class LL_NextLevelDB_Client extends Evented_Class {
         if (a.length === 3) {
             callback = a[2];
             decode = false;
+        }
+        if (a.length === 4) {
+            callback = a[3];
+            remove_kp = false;
         }
 
         // no callback on this
@@ -727,6 +740,7 @@ class LL_NextLevelDB_Client extends Evented_Class {
 
                         if (response_type_code === ERROR_MESSAGE) {
                             //callback(buf_the_rest);
+                            console.trace();
                             throw 'NYI';
                         } else {
 
@@ -838,6 +852,8 @@ class LL_NextLevelDB_Client extends Evented_Class {
 
             if (message_type === RECORD_PAGING_NONE) {
 
+                // Server not returning records right?
+
                 if (decode) {
                     ws_response_handlers[idx] = function (obj_message) {
                         [response_type_code, pos] = xas2.read(obj_message, pos);
@@ -851,10 +867,34 @@ class LL_NextLevelDB_Client extends Evented_Class {
 
                         //let decoded = Binary_Encoding.decode(buf_the_rest);
 
+
+
                         var row_buffers = Binary_Encoding.get_row_buffers(buf_the_rest);
-                        let decoded = Model_Database.decode_model_rows(row_buffers, 1);
+                        console.log('row_buffers', row_buffers);
+                        console.log('row_buffers', row_buffers.length);
+                        //throw 'stop';
+
+                        // Keep or remove KP?
+                        //let decoded = Model_Database.decode_model_rows(row_buffers, 1);
+
+                        let decoded;
+                        if (remove_kp) {
+                            decoded = Model_Database.decode_model_rows(row_buffers, 1);
+                        } else {
+
+                            // Local problem...?
+
+                            decoded = Model_Database.decode_model_rows(row_buffers);
+                        }
+
+                        // Because we may need to keep the kps to put them into the db properly.
+                        //  a remove_kp option would help.
+                        //  with some function calls it would be obvious.
+
+
                         // To remove a single key prefix here.
                         //console.log('decoded', decoded);
+                        //throw 'stop';
 
                         callback(null, decoded);
                         ws_response_handlers[idx] = null;
@@ -1061,7 +1101,7 @@ class LL_NextLevelDB_Client extends Evented_Class {
 
     // and have a decode option
 
-    observe_send_binary_message(message, decode = false) {
+    observe_send_binary_message(message, decode = false, remove_kp = false) {
 
         // Reads the response message type.
         //  Will be worthwhile to make the send message type optional?
@@ -1351,7 +1391,7 @@ class LL_NextLevelDB_Client extends Evented_Class {
 
 
             } else {
-                console.log('not decoding incoming message message_type, ', message_type);
+                //console.log('not decoding incoming message message_type, ', message_type);
                 //console.log('buf_the_rest', buf_the_rest);
 
                 // Though it does not decode the messages, it could trim them?
@@ -1735,7 +1775,12 @@ class LL_NextLevelDB_Client extends Evented_Class {
     //  
 
 
-    ll_get_records_by_key_prefix(key_prefix, paging, decode = false, callback) {
+
+    // Also, option to remove the kp from the result.
+    //  useful when getting records we know are within one table.
+
+
+    ll_get_records_by_key_prefix(key_prefix, paging, decode = false, remove_kps = false, callback) {
 
         // Should probably use a sig test in the client.
         //  Maybe will want decoding in the client too.
@@ -1776,6 +1821,15 @@ class LL_NextLevelDB_Client extends Evented_Class {
             paging = new Paging.None();
             callback = a[2];
 
+        } else if (sig === '[n,b,b,f]') {
+            buf_key_prefix = xas2(key_prefix).buffer;
+            decode = a[1];
+            remove_kps = a[2];
+
+
+            paging = new Paging.None();
+            callback = a[3];
+
         } else if (sig === '[n,b,o]') {
             //buf_key_prefix = xas2(key_prefix).buffer;
             //decode = a[1];
@@ -1810,7 +1864,7 @@ class LL_NextLevelDB_Client extends Evented_Class {
         var buf_u = Buffer.concat([buf_key_prefix, buf_1]);
 
         if (callback) {
-            this.ll_get_records_in_range(buf_l, buf_u, paging, decode, callback);
+            this.ll_get_records_in_range(buf_l, buf_u, paging, decode, remove_kps, callback);
         } else {
             return this.ll_get_records_in_range(buf_l, buf_u, paging, decode);
         }
@@ -2150,7 +2204,7 @@ class LL_NextLevelDB_Client extends Evented_Class {
     // decoding option of removing table key prefixes.
     //  
 
-    ll_get_records_in_range(buf_l, buf_u, paging, decode = false, callback) {
+    ll_get_records_in_range(buf_l, buf_u, paging, decode = false, remove_kps = false, callback) {
         // 
         // Could have paging and observable options here in this function.
         //  Basically need to implement them all over the place in a flexible way.
@@ -2183,9 +2237,14 @@ class LL_NextLevelDB_Client extends Evented_Class {
             //paging = new Paging.None();
             callback = a[3];
         } else if (sig === '[B,B,o,b,f]') {
+            callback = a[4];
+            remove_kps = false
             //paging = new Paging.None();
             //callback = a[3];
         } else if (sig === '[B,B,o,b]') {
+            //paging = new Paging.None();
+            //callback = a[3];
+        } else if (sig === '[B,B,o,b,b,f]') {
             //paging = new Paging.None();
             //callback = a[3];
         } else {
@@ -2219,7 +2278,10 @@ class LL_NextLevelDB_Client extends Evented_Class {
 
             //console.log('pre this.send_binary_message, with cb', buf_query);
 
-            this.send_binary_message(buf_query, RECORD_PAGING_NONE, decode, (err, res_binary_message) => {
+
+            // and another option for send_binary_message
+
+            this.send_binary_message(buf_query, RECORD_PAGING_NONE, decode, remove_kps, (err, res_binary_message) => {
                 if (err) {
                     callback(err);
                 } else {
@@ -2250,7 +2312,7 @@ class LL_NextLevelDB_Client extends Evented_Class {
             //console.log('buf_query', buf_query);
 
             //let obs = this.observe_send_binary_message(buf_query, paging.buffer, decode);
-            let obs = this.observe_send_binary_message(buf_query, decode);
+            let obs = this.observe_send_binary_message(buf_query, decode, remove_kps);
             return obs;
             //throw 'NYI';
 

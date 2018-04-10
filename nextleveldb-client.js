@@ -1001,7 +1001,12 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
     //  More complex server-side functionality will allow yet more complex and useful queies to take place server-side.
     //  
 
-    get_table_records(table_name, paging, decode = true, callback) {
+    get_table_records(table_name, paging, decode = true, remove_kps = true, callback) {
+
+
+        // Should possibly remove the table KPs.
+        //  Doing this on a Buffer would be quite useful maybe.
+
 
         // With optional decoding too...
 
@@ -1035,12 +1040,17 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
             paging = null;
             decode = a[1];
             callback = a[2];
+        } else if (sig === '[s,b,b,f]') {
+            paging = null;
+            decode = a[1];
+            remove_kps = a[2];
+            callback = a[3];
         } else {
             console.trace();
             throw 'Unexpected sig to get_table_records: ' + sig;
         }
 
-        console.log('decode', decode);
+        //console.log('decode', decode);
 
 
         //console.log('sig', sig);
@@ -1090,14 +1100,14 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
                 if (callback) {
 
                     // Remove table kps from records when decoding.
-                    this.get_records_by_key_prefix(kp, decode, callback);
+                    this.get_records_by_key_prefix(kp, decode, remove_kps, callback);
 
                 } else {
                     console.log('paging', paging);
 
                     //throw 'stop';
 
-                    let obs = this.get_records_by_key_prefix(kp, paging, decode);
+                    let obs = this.get_records_by_key_prefix(kp, paging, decode, remove_kps);
                     //return obs;
                     let data_pages = [];
 
