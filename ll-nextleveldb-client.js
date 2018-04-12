@@ -2,6 +2,16 @@
  * Created by James on 15/10/2016.
  */
 
+
+// Could do with more client-side functionality to select data from a table
+//  Select data from a key range (could be within a table)
+// Server-side select_from table is working nicely, want it on the client too.
+
+
+
+
+
+
 const http = require('http');
 const url = require('url');
 
@@ -53,6 +63,9 @@ const ENSURE_TABLE = 20;
 const ENSURE_TABLES = 21;
 const TABLE_EXISTS = 22;
 const TABLE_ID_BY_NAME = 23;
+
+const SELECT_FROM_TABLE = 41;
+
 // RENAME_TABLE
 const GET_TABLE_FIELDS_INFO = 24;
 const LL_SUBSCRIBE_ALL = 60;
@@ -1101,7 +1114,17 @@ class LL_NextLevelDB_Client extends Evented_Class {
 
     // and have a decode option
 
+
+    // Want different ways of calling it so that the pages get broken up
+    //  
+
     observe_send_binary_message(message, decode = false, remove_kp = false) {
+
+        // Maybe this could also separate out individual paging results from the pages sent from the server.
+        //  Paging is most important in transmission. Probably won't be passing the pages around that much as complete pages.
+        let str_result_grouping = '';
+
+
 
         // Reads the response message type.
         //  Will be worthwhile to make the send message type optional?
@@ -1121,6 +1144,39 @@ class LL_NextLevelDB_Client extends Evented_Class {
 
         // Maybe this will be the ll version that does not decode the values.
 
+
+        let a = arguments,
+            sig = get_a_sig(arguments);
+        //console.log('observe_send_binary_message sig', sig);
+
+
+        if (sig === '[n,a,o]') {
+            // will need to compose the message into a buffer.
+
+            let [i_command_type, arr_args, paging] = a;
+            //console.log('[i_command_type, paging, arr_args]', [i_command_type, paging, arr_args]);
+
+            // Create the binary message, with the paging, then the params.
+
+            let arr_bufs_msg = [xas2(i_command_type).buffer, paging.buffer, Binary_Encoding.encode_to_buffer(arr_args)];
+            //console.log('arr_bufs_msg', arr_bufs_msg);
+            message = Buffer.concat(arr_bufs_msg);
+            decode = true;
+            remove_kp = true;
+
+            //throw 'stop';
+
+        } else if (sig === '[n,a,o,s]') {
+            let i_command_type, arr_args, paging;
+            [i_command_type, arr_args, paging, str_result_grouping] = a;
+            //console.log('[i_command_type, arr_args, paging, str_result_grouping]', [i_command_type, arr_args, paging, str_result_grouping]);
+            let arr_bufs_msg = [xas2(i_command_type).buffer, paging.buffer, Binary_Encoding.encode_to_buffer(arr_args)];
+            //console.log('arr_bufs_msg', arr_bufs_msg);
+            message = Buffer.concat(arr_bufs_msg);
+            decode = true;
+            remove_kp = true;
+        }
+
         let idx = this.id_ws_req++,
             ws_response_handlers = this.ws_response_handlers,
             pos = 0,
@@ -1128,6 +1184,10 @@ class LL_NextLevelDB_Client extends Evented_Class {
 
         var buf_2 = Buffer.concat([xas2(idx).buffer, message]);
         let res = new Evented_Class();
+
+
+
+
 
         //let send_message_receipt = this.send_message_receipt;
 
@@ -1159,9 +1219,10 @@ class LL_NextLevelDB_Client extends Evented_Class {
             //  However, the decoding type has now been put into the protocol, within the messages, so it's on a lower level.
             //   The low level API has become more complex.
 
-            // console.log('decode', decode);
+            //console.log('decode', decode);
 
             if (decode) {
+                //console.log('str_result_grouping', str_result_grouping);
 
                 if (message_type === BINARY_PAGING_NONE) {
 
@@ -1170,6 +1231,10 @@ class LL_NextLevelDB_Client extends Evented_Class {
                     var buf_the_rest = Buffer.alloc(obj_message.length - pos);
                     obj_message.copy(buf_the_rest, 0, pos);
                     //console.log('buf_the_rest', buf_the_rest);
+
+                    // Maybe do full decode buffer, and enclose the results as an array in all cases.
+                    //  Could change the server-side code to use the paging helper that would always do this.
+
                     let decoded = Binary_Encoding.decode_buffer(buf_the_rest)[0];
                     //console.log('** decoded', decoded);
 
@@ -1186,19 +1251,51 @@ class LL_NextLevelDB_Client extends Evented_Class {
                     obj_message.copy(buf_the_rest, 0, pos);
 
                     let decoded = Binary_Encoding.decode_buffer(buf_the_rest)[0];
-                    res.raise('next', decoded);
+
+                    if (str_result_grouping === 'single') {
+                        each(decoded, item => res.raise('next', item));
+                    } else {
+                        res.raise('next', decoded);
+                    }
+
+                    //console.log('decoded', decoded);
+
+
                     this.send_message_receipt(idx, page_number);
                 }
                 if (message_type === BINARY_PAGING_LAST) {
+
+
                     [page_number, pos] = xas2.read(obj_message, pos);
                     var buf_the_rest = Buffer.alloc(obj_message.length - pos);
                     obj_message.copy(buf_the_rest, 0, pos);
 
-                    let decoded = Binary_Encoding.decode_buffer(buf_the_rest)[0];
+                    // Not so sure we want the 0th item?
+                    //  Or handle a page differently?
+
+                    //console.log('buf_the_rest', buf_the_rest);
+
+
+                    // Server-side the results need to be put into separate arrays.
+
+
+                    let decoded_buffer = Binary_Encoding.decode_buffer(buf_the_rest);
+
+                    if (str_result_grouping === 'single') {
+                        each(decoded_buffer, item => res.raise('next', item));
+                    } else {
+                        res.raise('next', decoded_buffer);
+                    }
+                    //console.log('decoded_buffer', decoded_buffer);
+
+                    //let decoded = Binary_Encoding.decode_buffer(buf_the_rest)[0];
                     //console.log('decoded', decoded);
 
-                    res.raise('next', decoded);
-                    res.raise('complete', decoded);
+                    //throw 'stop';
+
+                    //res.raise('next', decoded_buffer);
+                    res.raise('complete');
+                    //res.raise('complete', decoded_buffer);
                     this.send_message_receipt(idx, page_number);
                 }
 
@@ -2196,6 +2293,13 @@ class LL_NextLevelDB_Client extends Evented_Class {
     //  Getting key samplings would be useful to start with, to get queries that would return close to a known amount.
 
     // Maybe this could even be expanded to have a 'limit' option, so no need for the 'up to' version?
+
+    // Could have paging option.
+    //  Maybe we want silent paging in the background though?
+    //   That will maybe happen when using a callback with no paging option specified.
+
+    // Maybe move to main non ll part because it uses the core model, which is not available here.
+
 
 
 
@@ -3329,7 +3433,9 @@ if (require.main === module) {
                     }
                 })
             }
-            test_get_table_fields_info();
+            //test_get_table_fields_info();
+
+
 
 
             /*

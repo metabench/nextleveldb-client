@@ -4,16 +4,16 @@
     "license": "MIT",
     "dependencies": {
         "arr-table": "^0.0.5",
-        "binary-encoding": "^0.0.41",
+        "binary-encoding": "^0.0.44",
         "lang-mini": "^0.0.5",
         "moment": "^2.21.0",
         "my-config": "^2.0.0",
-        "nextleveldb-model": "^0.0.34",
+        "nextleveldb-model": "^0.0.36",
         "recursive-readdir": "^2.2.2",
         "request": "^2.85.0",
         "single-line-log": "^1.1.2",
         "ws": "^5.1.0",
-        "xas2": "^0.0.12"
+        "xas2": "^0.0.13"
     },
     "engines": {
         "node": ">=8.5.0"
@@ -24,5 +24,5 @@
         "type": "git",
         "url": "https://github.com/metabench/nextleveldb-client.git"
     },
-    "version": "0.0.40"
+    "version": "0.0.41"
 }

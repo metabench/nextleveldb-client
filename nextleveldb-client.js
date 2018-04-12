@@ -32,6 +32,19 @@ const resolve = path.resolve;
 
 const Table_Subscription = require('./table-subscription');
 
+
+
+
+// Maybe these shouldn't be here.
+//  Could make an ll version of function and refactor it.
+
+const SELECT_FROM_TABLE = 41;
+
+
+
+
+
+
 const obs_throughput = (obs_res, obs_inner) => {
     obs_inner.on('next', data => {
         obs_res.raise('next', data);
@@ -228,6 +241,24 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
     // Could have a local Model?
     // Initial setup of crypto database.
     // load model, including specific tables
+
+
+    start(callback) {
+        super.start((err, res) => {
+            if (err) {
+                callback(err);
+            } else {
+                this.load_core((err, model) => {
+                    if (err) {
+                        callback(err);
+                    } else {
+                        callback(null, model);
+                    }
+                })
+            }
+        })
+    }
+
     /**
      *
      *
@@ -309,7 +340,6 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
      * @memberof NextlevelDB_Client
      */
     load_core(callback) {
-        var that = this;
         this.get_core((err, buf_core) => {
             if (err) {
                 callback(err);
@@ -317,8 +347,8 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
                 //console.log('buf_core', buf_core);
 
                 //throw 'stop';
-                that.model = Model_Database.load_buf(buf_core);
-                callback(null, that.model);
+                this.model = Model_Database.load_buf(buf_core);
+                callback(null, this.model);
             }
         });
     }
@@ -2613,6 +2643,8 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
      * @memberof NextlevelDB_Client
      */
     get_table_index_selection_records(table_name, arr_index_selection, callback) {
+
+        throw 'NYI';
         if (this.model) {
             var table = this.model.map_tables[table_name];
             if (table) {
@@ -2626,6 +2658,95 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
             callback("Expected this.model, otherwise can't find table by name");
         }
     }
+
+
+
+    select_from_table(table, arr_fields, paging, decode = true, callback) {
+
+
+        // want to track the specified paging too.
+        //  We may use one type of paging to communicate with the server, and another type of paging for the results.
+        //  Individual results seem more useful.
+
+        // results as 'single' or 'page'
+
+        let result_grouping = 'single';
+
+
+
+
+
+        // Could automatically encode the array of fields as their IDs, use the model for this?
+        //  Then only the field IDs would be sent to the server, save bandwidth and some server-side processing (not much).
+
+
+        let a = arguments,
+            sig = get_a_sig(a);
+
+        // Want to specify record paging
+        //  Will get back binary buffers.
+        //  The non-decode version will be called on the server, decoding here is an option on the client.
+
+        // Then very soon need to move to more work on syncing.
+        //  Making the syncing process very quick on startup if there is not much to sync.
+        //   Would involve looking into the subdivisions of records both on the local and remote.
+        //    select_from_table is one of the underlying functions which would enable this in a less clunky way.
+
+
+
+        //  Showing progress indications.
+
+
+        let table_id;
+
+
+        console.log('select_from_table sig', sig);
+
+        if (sig === '[s,a]') {
+            table_id = this.model.table_id(table);
+            paging = new Paging.Record(1024);
+            // by default lets get 1024 records at once.
+        }
+
+        // Paging by default will be useful in many situations.
+        //  
+
+
+        // Though we specify paging on observe_send_binary_message, we also want to be able to split up results that come in.
+
+
+
+        let res = this.observe_send_binary_message(SELECT_FROM_TABLE, [table_id, arr_fields], paging, result_grouping);
+
+
+
+
+        if (callback) {
+            throw 'NYI';
+        } else {
+            return res;
+        }
+
+
+
+        //throw 'stop';
+
+        // basically call the observable function.
+
+
+
+        // Use inner observable?
+        //  That seems best, while we build up the results on the client-side, still using paging to get the data from the server.
+        //   Paged data retrieval is much kinder on the server's resources.
+
+
+
+
+
+
+    }
+
+
 
     get_table_record(table_name, arr_key, callback) {
         this.get_table_kp_by_name(table_name, (err, kp) => {
@@ -3130,18 +3251,6 @@ module.exports = NextlevelDB_Client;
 // to the xeon?
 //  192.168.1.159
 
-var local_info = {
-    'server_address': 'localhost',
-    //'server_address': 'localhost',
-    //'db_path': 'localhost',
-    'server_port': 420
-}
-
-var local_xeon = {
-    'server_address': '192.168.1.159',
-    'server_port': 420
-}
-
 
 if (require.main === module) {
 
@@ -3152,11 +3261,30 @@ if (require.main === module) {
     });
 
     let access_token = config.nextleveldb_access.root[0];
+
+
+
+    var local_info = {
+        'server_address': 'localhost',
+        //'server_address': 'localhost',
+        //'db_path': 'localhost',
+        'server_port': 420,
+        'access_token': access_token
+    }
+
+    var local_xeon = {
+        'server_address': '192.168.1.159',
+        'server_port': 420
+    }
+
+
     console.log('access_token', access_token);
     var server_data3 = config.nextleveldb_connections.data3;
     server_data3.access_token = access_token;
 
-    var lc = new NextlevelDB_Client(server_data3);
+
+
+    var lc = new NextlevelDB_Client(local_info);
 
     // Looks like the level client keeps itself open.
     //  console.log('pre start');
@@ -3166,6 +3294,11 @@ if (require.main === module) {
             console.trace();
             throw err;
         } else {
+
+            // Automatically loading the core on start makes sense.
+
+
+
             // count_each_table_records_up_to
             // count_each_table_records
 
@@ -3279,7 +3412,34 @@ if (require.main === module) {
                 });
 
             }
-            test_paged_get_table_keys('bittrex market summary snapshots');
+            //test_paged_get_table_keys('bittrex market summary snapshots');
+
+            let test_select_from_table = () => {
+
+                // Want single results back by default.
+
+
+                let obs_select = lc.select_from_table('bittrex currencies', ['id', 'Currency', 'CurrencyLong']);
+
+                // Without paging specified here, it's better to get the records individually.
+                //  Or can specify we give back a page in the results.
+                //   An observable callback for each record would be quite a nice programming model, may not be the most performant.
+                //    Still should be OK at processing many records per second.
+
+
+
+                obs_select.on('next', data => {
+
+                    // We still want them back individually as we have not specified paging.
+
+
+
+
+                    console.log('obs_select data', data);
+                })
+
+            }
+            test_select_from_table();
 
         }
     });
