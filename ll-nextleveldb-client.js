@@ -68,6 +68,8 @@ const SELECT_FROM_TABLE = 41;
 
 // RENAME_TABLE
 const GET_TABLE_FIELDS_INFO = 24;
+const GET_TABLE_KEY_SUBDIVISIONS = 25;
+
 const LL_SUBSCRIBE_ALL = 60;
 const LL_SUBSCRIBE_KEY_PREFIX_PUTS = 61;
 const LL_UNSUBSCRIBE_SUBSCRIPTION = 62;
@@ -883,7 +885,7 @@ class LL_NextLevelDB_Client extends Evented_Class {
 
 
                         var row_buffers = Binary_Encoding.get_row_buffers(buf_the_rest);
-                        console.log('row_buffers', row_buffers);
+                        //console.log('row_buffers', row_buffers);
                         console.log('row_buffers', row_buffers.length);
                         //throw 'stop';
 
@@ -1118,11 +1120,40 @@ class LL_NextLevelDB_Client extends Evented_Class {
     // Want different ways of calling it so that the pages get broken up
     //  
 
-    observe_send_binary_message(message, decode = false, remove_kp = false) {
+
+    // send(message_type_id, paging, args, decode, remove_kp, callback)
+    //  Would either send an observable or callback type message
+    //  Would handle some details of message encoding.
+    //   Arguments after the paging object would be deconstructed.
+    //   Nice to send remove kp option within the paging options.
+    //    Decode option could be sent there too.
+    //    Remove kp and decode are standard, and the server could process remove kp as the last step.
+    //     Inner functions would not need to handle this, but many of them do.
+    //  Making more advanced / API2 paging options would be nice.
+    //   Incorporating kp removal into the paging options would be very cool.
+    //    Would not necessarily just work with records. Try making it work with keys too.
+    //  Want a standard way to send the remove_kp param.
+    //   Would be cool to do it in the paging object as standard.
+
+
+
+
+
+
+
+
+
+
+    // A param to remove the result from the array?
+    //  We always decode an array from the server but it could be just one message.
+    //   For binary, could incorporate single_item message status / code
+    //    
+
+    observe_send_binary_message(message, decode = false, remove_kp = false, str_result_grouping = '') {
 
         // Maybe this could also separate out individual paging results from the pages sent from the server.
         //  Paging is most important in transmission. Probably won't be passing the pages around that much as complete pages.
-        let str_result_grouping = '';
+        //let str_result_grouping = '';
 
 
 
@@ -1175,6 +1206,16 @@ class LL_NextLevelDB_Client extends Evented_Class {
             message = Buffer.concat(arr_bufs_msg);
             decode = true;
             remove_kp = true;
+        } else if (sig === '[B]') {
+
+        } else if (sig === '[B,b]') {
+
+        } else if (sig === '[B,b,b]') {
+
+        } else if (sig === '[B,b,b,s]') {
+
+        } else {
+            throw 'observe_send_binary_message: Unexpected signature ' + sig
         }
 
         let idx = this.id_ws_req++,
@@ -1219,7 +1260,7 @@ class LL_NextLevelDB_Client extends Evented_Class {
             //  However, the decoding type has now been put into the protocol, within the messages, so it's on a lower level.
             //   The low level API has become more complex.
 
-            //console.log('decode', decode);
+            console.log('decode', decode);
 
             if (decode) {
                 //console.log('str_result_grouping', str_result_grouping);
@@ -1243,6 +1284,7 @@ class LL_NextLevelDB_Client extends Evented_Class {
                     res.raise('complete', decoded);
                 }
                 if (message_type === BINARY_PAGING_FLOW) {
+                    console.log('BINARY_PAGING_FLOW');
 
                     [page_number, pos] = xas2.read(obj_message, pos);
 
@@ -1264,24 +1306,38 @@ class LL_NextLevelDB_Client extends Evented_Class {
                     this.send_message_receipt(idx, page_number);
                 }
                 if (message_type === BINARY_PAGING_LAST) {
+                    console.log('BINARY_PAGING_LAST');
 
 
                     [page_number, pos] = xas2.read(obj_message, pos);
                     var buf_the_rest = Buffer.alloc(obj_message.length - pos);
                     obj_message.copy(buf_the_rest, 0, pos);
 
+                    console.log('page_number', page_number);
+
                     // Not so sure we want the 0th item?
                     //  Or handle a page differently?
 
-                    //console.log('buf_the_rest', buf_the_rest);
+                    console.log('buf_the_rest', buf_the_rest);
 
 
                     // Server-side the results need to be put into separate arrays.
 
+                    // Within the page, we could get a large amount of data.
+                    //  For the moment, could make the new server side send function wrap the result in an array of length 1
 
-                    let decoded_buffer = Binary_Encoding.decode_buffer(buf_the_rest);
+
+
+                    let decoded_buffer = Binary_Encoding.decode_buffer(buf_the_rest)[0];
+
+                    console.log('decoded_buffer', decoded_buffer);
+
+                    //console.log('str_result_grouping', str_result_grouping);
 
                     if (str_result_grouping === 'single') {
+
+
+
                         each(decoded_buffer, item => res.raise('next', item));
                     } else {
                         res.raise('next', decoded_buffer);
@@ -1294,8 +1350,10 @@ class LL_NextLevelDB_Client extends Evented_Class {
                     //throw 'stop';
 
                     //res.raise('next', decoded_buffer);
-                    res.raise('complete');
                     //res.raise('complete', decoded_buffer);
+                    //res.raise('complete', decoded_buffer);
+                    console.log('pre res raise complete');
+                    res.raise('complete', {});
                     this.send_message_receipt(idx, page_number);
                 }
 
@@ -1339,7 +1397,7 @@ class LL_NextLevelDB_Client extends Evented_Class {
                     let arr_bufs_kv = Binary_Encoding.split_length_item_encoded_buffer_to_kv(buf_the_rest);
                     //console.log('arr_bufs_kv', arr_bufs_kv);
 
-                    let remove_kp = true;
+                    //let remove_kp = true;
                     let arr_decoded = Model_Database.decode_model_rows(arr_bufs_kv[0], remove_kp);
 
                     //console.log('arr_decoded', arr_decoded);
@@ -1368,7 +1426,7 @@ class LL_NextLevelDB_Client extends Evented_Class {
                     //console.log('buf2', buf2);
                     // read and copy buffer.
                     let arr_bufs_kv = Binary_Encoding.split_length_item_encoded_buffer_to_kv(buf2);
-                    let remove_kp = true;
+                    //let remove_kp = true;
                     //console.log('arr_bufs_kv[0]', arr_bufs_kv[0]);
                     //console.log('arr_bufs_kv', arr_bufs_kv);
                     //throw 'stop';
@@ -1385,7 +1443,7 @@ class LL_NextLevelDB_Client extends Evented_Class {
                     let buf2 = Buffer.alloc(buf_the_rest.length - pos);
                     buf_the_rest.copy(buf2, 0, pos);
                     let arr_bufs_kv = Binary_Encoding.split_length_item_encoded_buffer_to_kv(buf2);
-                    let remove_kp = true;
+                    //let remove_kp = true;
                     //console.log('arr_bufs_kv', arr_bufs_kv);
                     let arr_decoded = Model_Database.decode_model_rows(arr_bufs_kv, remove_kp);
                     //console.log('arr_decoded', arr_decoded);
@@ -1406,7 +1464,7 @@ class LL_NextLevelDB_Client extends Evented_Class {
                     let arr_bufs_k = Binary_Encoding.split_length_item_encoded_buffer(buf_the_rest);
                     //console.log('arr_bufs_k', arr_bufs_k);
 
-                    let remove_kp = true;
+                    //let remove_kp = true;
 
                     //throw 'stop';
                     // Decode them as keys.
@@ -1457,10 +1515,11 @@ class LL_NextLevelDB_Client extends Evented_Class {
                     let arr_bufs_keys = Binary_Encoding.split_length_item_encoded_buffer(buf2);
 
 
-                    let remove_kp = false;
+                    //let remove_kp = false;
                     //console.log('arr_bufs_kv[0]', arr_bufs_kv[0]);
                     //console.log('arr_bufs_kv', arr_bufs_kv);
                     //throw 'stop';
+                    //console.log('2) * remove_kp', remove_kp);
                     let arr_decoded = Model_Database.decode_keys(arr_bufs_keys, remove_kp);
 
                     res.raise('next', arr_decoded);
@@ -1468,15 +1527,20 @@ class LL_NextLevelDB_Client extends Evented_Class {
                     this.send_message_receipt(idx, page_number);
                 }
                 if (message_type === KEY_PAGING_LAST) {
+
+                    // 
+
+
                     var buf_the_rest = Buffer.alloc(obj_message.length - pos);
                     obj_message.copy(buf_the_rest, 0, pos);
                     [page_number, pos] = xas2.read(buf_the_rest, 0);
-                    console.log('page_number', page_number);
+                    //console.log('page_number', page_number);
                     let buf2 = Buffer.alloc(buf_the_rest.length - pos);
                     buf_the_rest.copy(buf2, 0, pos);
                     let arr_bufs_k = Binary_Encoding.split_length_item_encoded_buffer(buf2);
-                    let remove_kp = false;
+                    //let remove_kp = false;
                     //console.log('arr_bufs_kv', arr_bufs_kv);
+                    //console.log('3) * remove_kp', remove_kp);
                     let arr_decoded = Model_Database.decode_keys(arr_bufs_k, remove_kp);
 
                     res.raise('next', arr_decoded);
@@ -1583,6 +1647,55 @@ class LL_NextLevelDB_Client extends Evented_Class {
         return res;
 
     }
+
+
+    // And return options could have options that guide client-side processing, such as whether or not to decode.
+
+
+    //  return options could ask for a promise rather than observable.
+    // send(message_type_id, message_args, return_options, [callback])
+
+    send(message_type_id, message_args, return_options, callback) {
+        // Should probably use inner observable send?
+
+        // default return options too
+
+        return_options = return_options || new Paging.Record_Paging(1024);
+        return_options.decode = true;
+        return_options.remove_kps = true;
+
+
+
+        // Except different functions will either be called with an observable or with a callback, could try to use observable_send_binary_message for all calls, see how that works, and then possibly change interfaces / APIs
+        //  to accommodate that.
+
+        let arr_bufs = [xas2(message_type_id).buffer, return_options.buffer, Binary_Encoding.encode_to_buffer(message_args)];
+        let buf_msg = Buffer.concat(arr_bufs);
+
+
+
+        let obs_res = this.observe_send_binary_message(buf_msg, return_options.decode || false, false, 'single'); // Don't want the kp to be removed client-side.
+
+        // and we get back pages here.
+        //  assume the client wants individual records.
+
+        // observable wrapper
+
+
+        // then if we want the results decoded, we can put it through an observable_decode_processor
+
+        if (callback) {
+            throw 'NYI 1';
+        } else {
+
+            // 
+
+            return obs_res;
+        }
+
+    }
+
+
 
 
     // decode records?
@@ -1939,6 +2052,12 @@ class LL_NextLevelDB_Client extends Evented_Class {
             //paging = new Paging.None();
             //callback = a[2];
             //throw 'stop';
+        } else if (sig === '[n,o,b,b]') {
+            buf_key_prefix = xas2(key_prefix).buffer;
+            //decode = a[1];
+            //paging = new Paging.None();
+            //callback = a[2];
+            //throw 'stop';
         } else {
 
 
@@ -2039,9 +2158,16 @@ class LL_NextLevelDB_Client extends Evented_Class {
     //   Want to get the last record in an efficient way, general functionality to do with limits and reverse option would help.
 
 
+    // option to remove the key prefix from the results would help.
+    //  when getting data for just one table, it would be nice to discard this.
+
+    // Could also be nice to make it an option on the server that can be handled automatically by an output layer.
+
+    // By default it's sensible to discard the key prefix.
+    //  Worth having it as an option. Will make default = false for the moment.
 
 
-    ll_get_keys_by_key_prefix(key_prefix, paging, decode = false, callback) {
+    ll_get_keys_by_key_prefix(key_prefix, paging, decode = false, remove_kp = false, callback) {
 
         // Should probably use a sig test in the client.
         //  Maybe will want decoding in the client too.
@@ -2094,6 +2220,12 @@ class LL_NextLevelDB_Client extends Evented_Class {
             //paging = new Paging.None();
             //callback = a[2];
             //throw 'stop';
+        } else if (sig === '[n,o,b,b]') {
+            buf_key_prefix = xas2(key_prefix).buffer;
+            //decode = a[1];
+            //paging = new Paging.None();
+            //callback = a[2];
+            //throw 'stop';
         } else {
 
 
@@ -2116,9 +2248,9 @@ class LL_NextLevelDB_Client extends Evented_Class {
         var buf_u = Buffer.concat([buf_key_prefix, buf_1]);
 
         if (callback) {
-            this.ll_get_keys_in_range(buf_l, buf_u, paging, decode, callback);
+            this.ll_get_keys_in_range(buf_l, buf_u, paging, decode, remove_kp, callback);
         } else {
-            return this.ll_get_keys_in_range(buf_l, buf_u, paging, decode);
+            return this.ll_get_keys_in_range(buf_l, buf_u, paging, remove_kp, decode);
         }
     }
 
@@ -2137,12 +2269,12 @@ class LL_NextLevelDB_Client extends Evented_Class {
      * @param {any} callback 
      * @memberof LL_NextLevelDB_Client
      */
-    ll_get_keys_in_range(buf_l, buf_u, paging, decode = false, callback) {
+    ll_get_keys_in_range(buf_l, buf_u, paging, decode = false, remove_kp = false, callback) {
 
         let a = arguments;
         let sig = get_a_sig(a);
 
-        //console.log('sig', sig);
+        console.log('ll_get_keys_in_range sig', sig);
 
         //throw 'stop';
 
@@ -2185,10 +2317,27 @@ class LL_NextLevelDB_Client extends Evented_Class {
 
 
         } else if (sig === '[B,B,o,b]') {
+
+            // Could even have a server-side option to remove the KPs. This would save data in transit.
+
+
             var buf_command = xas2(LL_GET_KEYS_IN_RANGE).buffer;
             var buf_query = Buffer.concat([buf_command, paging.buffer, xas2(buf_l.length).buffer, buf_l, xas2(buf_u.length).buffer, buf_u]);
 
             let obs = this.observe_send_binary_message(buf_query, decode);
+            return obs;
+
+
+
+        } else if (sig === '[B,B,o,b,b]') {
+
+            // Could even have a server-side option to remove the KPs. This would save data in transit.
+
+
+            var buf_command = xas2(LL_GET_KEYS_IN_RANGE).buffer;
+            var buf_query = Buffer.concat([buf_command, paging.buffer, xas2(buf_l.length).buffer, buf_l, xas2(buf_u.length).buffer, buf_u]);
+            console.log('remove_kp', remove_kp);
+            let obs = this.observe_send_binary_message(buf_query, decode, remove_kp);
             return obs;
 
 

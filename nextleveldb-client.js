@@ -69,6 +69,7 @@ const obs_throughput = (obs_res, obs_inner) => {
 //
 
 const INSERT_TABLE_RECORD = 12;
+const GET_TABLE_KEY_SUBDIVISIONS = 25;
 
 // Could separate into browser-client and node-client.
 
@@ -802,6 +803,7 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
                 } else {
                     //console.log('res_count', res_count);
 
+
                     callback(null, res_count);
 
                     //
@@ -1252,6 +1254,47 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
             //throw 'stop';
         });
     }
+
+    get_table_key_subdivisions(table, callback) {
+        // Will call the server function to do this.
+        //  Want to make a concise new-school server function.
+        //  Want a concise way of calling it too.
+
+        // Want a flexible way of calling a server function, that's flexible about using a callback or not.
+
+        let obs_send = this.send(GET_TABLE_KEY_SUBDIVISIONS, [this.model.table_id(table)]);
+
+        if (callback) {
+
+            let res_all = [];
+
+            obs_send.on('next', data => {
+                //console.log('* data', data);
+                res_all.push(data);
+
+
+                // are getting pages back here
+
+            });
+            obs_send.on('complete', () => {
+                callback(null, res_all);
+            });
+            obs_send.on('error', err => {
+                callback(err);
+            });
+
+            //throw 'NYI';
+        } else {
+            return obs_send;
+        }
+
+
+
+
+
+    }
+
+
 
     // get_table_flat_records
 
@@ -2298,6 +2341,13 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
     }
 
 
+
+
+    // Would like to use paging in the background, but get the results back one at a time in the API.
+    //  Saves having to write an each() around the results set, though for loops would be more performant. 
+
+    // The default, simplest mode should probably default to that.
+
     // New version...
 
     get_table_keys(table_name, paging, decode = true, callback) {
@@ -2339,7 +2389,14 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
         }
         this.get_table_kp_by_name(table_name, (err, kp) => {
             if (err) {
-                callback(err);
+
+                if (callback) {
+                    callback(err);
+                } else {
+                    obs_res.raise('error', err);
+                }
+
+
             } else {
                 // Should also use an observable version of this, though the version with the callback would also be useful.
                 if (callback) {
@@ -2347,7 +2404,16 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
                     this.get_keys_by_key_prefix(kp, decode, callback);
                 } else {
                     //console.log('paging', paging);
-                    let obs = this.get_keys_by_key_prefix(kp, paging, decode);
+
+                    // Would like it so that we get the keys individually on the client.
+                    //  will make for more fn calls with a callback for each result.
+
+
+
+
+                    let obs = this.get_keys_by_key_prefix(kp, paging, decode, true);
+
+
                     let data_pages = [];
                     obs.on('next', data => {
                         obs_res.raise('next', data);
@@ -2437,6 +2503,10 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
             let kp = table_id * 2 + 2;
 
             //this.count_records_by_key_prefix(kp, callback);
+
+
+            // But the counts should not be as an array
+
             let obs_count_records = this.count_records_by_key_prefix(kp);
 
             let t_obs_count_records = tof(obs_count_records);
@@ -3418,8 +3488,16 @@ if (require.main === module) {
 
                 // Want single results back by default.
 
+                // Select all table keys
+                // get_table_keys
+                //  
 
-                let obs_select = lc.select_from_table('bittrex currencies', ['id', 'Currency', 'CurrencyLong']);
+
+
+
+
+                //let obs_select = lc.select_from_table('bittrex currencies', ['id', 'Currency', 'CurrencyLong']);
+                let obs_select = lc.select_from_table('bittrex markets', [0, 1, 3]);
 
                 // Without paging specified here, it's better to get the records individually.
                 //  Or can specify we give back a page in the results.
@@ -3437,9 +3515,51 @@ if (require.main === module) {
 
                     console.log('obs_select data', data);
                 })
+                obs_select.on('complete', () => {
+                    console.log('complete');
+                })
 
             }
-            test_select_from_table();
+            //test_select_from_table();
+
+
+            let test_get_table_keys = () => {
+
+                // should remove KPs by default.
+
+                let obs = lc.get_table_keys('bittrex markets');
+                obs.on('next', data => {
+                    console.log('data', data);
+                });
+                obs.on('complete', () => {
+                    console.log('complete');
+                })
+            }
+            //test_get_table_keys();
+
+
+            let test_get_table_key_subdivisions = () => {
+
+                /*
+
+                let obs = lc.get_table_key_subdivisions('bittrex market summary snapshots');
+
+
+
+                obs.on('next', data => console.log('2) data', data));
+
+                */
+
+                lc.get_table_key_subdivisions('bittrex market summary snapshots', (err, subdivisions) => {
+                    if (err) {
+                        throw err;
+                    } else {
+                        console.log('subdivisions', subdivisions);
+                    }
+                });
+
+            }
+            test_get_table_key_subdivisions();
 
         }
     });
