@@ -777,6 +777,46 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
         // just put them all for the moment.
     }
 
+
+
+
+
+    // A version with 'limit' would be nice.
+    //  Using the lower level version of the function, rather than using more advanced options for normal encoding is possible right now.
+
+    // A client-side limit processor that calls stop would be cool too.
+    //  Limiting on the server, sending the limit to the server, will be nice.
+
+    // May be worth forming the command options sooner.
+
+
+    //  would always use an observable
+    // send_command(options)
+    //  command name or command id
+    //  communication args
+    //   how the server returns the results
+    //    remove kp
+    //    limit
+    //    (tell it to encode specifically as records, keys or just binary)???
+    //   how the client processes the returned results
+    //    decoding
+    //     (probably best to remove KP from server side)
+    //  command args
+    //  and of course how to handle paging.
+
+    // This would make it very easy to get an observable to a server side function.
+    //  On the server side, there will be code that makes the processing more concise.
+
+    // Want to expand things in the direction of a Unified Communication Protocol.
+    //  The current Paging object will wind up doing plenty more to encode / decode messages.
+    // Or an actual OO message object would be cool.
+    //  Created on the client, reconstructed on the server.
+    // Command really.
+    // This will make for smaller code eventually.
+
+    // May keep old methods and compare speed?
+
+
     /**
      *
      *
@@ -784,7 +824,28 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
      * @param {any} callback
      * @memberof NextlevelDB_Client
      */
-    count_records_by_key_prefix(i_kp, callback) {
+    count_records_by_key_prefix(i_kp, limit = -1, callback) {
+
+
+        let a = arguments,
+            l = a.length,
+            sig = get_a_sig(a);
+
+        //console.log('count_records_by_key_prefix sig', sig);
+
+        if (sig === '[n,n]') {
+
+        } else if (sig === '[n,f]') {
+            callback = a[1];
+            limit = -1;
+        } else {
+            throw 'count_records_by_key_prefix unexpected sig ' + sig;
+        }
+
+
+
+        // Limit would be useful here.
+
         var buf_kp = xas2(i_kp).buffer;
         var buf_0 = Buffer.alloc(1);
         buf_0.writeUInt8(0, 0);
@@ -797,7 +858,13 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
 
 
         if (callback) {
-            this.ll_count_keys_in_range(buf_l, buf_u, (err, res_count) => {
+
+            // Would be nice to put limit (and even stop) capability into this.
+            //  An observable wrapper would handle the limit.
+
+
+
+            this.ll_count_keys_in_range(buf_l, buf_u, limit, (err, res_count) => {
                 if (err) {
                     throw err;
                 } else {
@@ -1255,26 +1322,225 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
         });
     }
 
+
+    // Client side remove_kp options?
+    //  The subdivisions could also have KPs stripped from the beginnings.
+
+    // Having a server-side function provide binary data by default could lead to some faster (but more difficult) processing.
+
+
+
+    //get_table_key_subdivisions(table, decode = true, callback) {
     get_table_key_subdivisions(table, callback) {
+
+        let a = arguments,
+            sig = get_a_sig(a);
+
+        // Would prefer to leave the table as a wildcard.
+
+
+
+        //if (sig === '[]')
+
+        // Maybe remove decode from the parameter.
+        //  Could generally only deal with encoded data
+
+        // making decoding an easy process will be nice.
+        //  However, we are dealing with index values in this function which work matching against each other when encoded.
+        //   decoding and re-encoding makes more overhead, leaving data encoded is the answer when it comes to perf.
+
+
+
+
+
         // Will call the server function to do this.
         //  Want to make a concise new-school server function.
         //  Want a concise way of calling it too.
 
         // Want a flexible way of calling a server function, that's flexible about using a callback or not.
+        // default decoding.
+        // Send with decoding being true?
+        // obs_separate
 
-        let obs_send = this.send(GET_TABLE_KEY_SUBDIVISIONS, [this.model.table_id(table)]);
+        // OO message system will come fairly soon, but it's worth getting a few more code paths working / upgraded with what we have already.
 
+        // obs_unpage
+
+
+        //let obs_unpage_binary = 
+
+        let obs_unpage_buffer = obs => {
+            let res = new Evented_Class();
+            obs.on('next', buf => {
+                // could be paged binary
+                // don't want to read the array.
+                // better in terms of memory handling for long pages to read through it raising events?
+                //console.log('obs_unpage_buffer buf', buf);
+
+                let arr_bufs = Binary_Encoding.split_encoded_buffer(buf);
+
+
+                //console.log('obs_unpage_buffer arr_bufs', arr_bufs);
+                //throw 'stop';
+                // need to split up a buffered array, without decoding it?
+                //  binary_encoding.split_array_encoded_buffer
+                //   splits it to other encoded buffers - gets the items out of the array
+                //console.log('arr', arr);
+
+                // 
+
+                each(arr_bufs, item => res.raise('next', item))
+            });
+            obs.on('error', () => res.raise('error'));
+            obs.on('complete', () => res.raise('complete'));
+            return res;
+        }
+
+        // Could there even be 2 levels of message envelope encoding?
+        //  Every item result encoded to be separate.
+        //   It does seem worth having these multiple encoding levels.
+        //   May want to get the individual binary results without destructuring / decoding the structure
+
+
+        // Observable that does one level of decoding...?
+
+        //  Condidering what is in the envelope, 
+
+
+        let obs_decode_message_envelope = obs => {
+            let res = new Evented_Class();
+            obs.on('next', buf => {
+                // need to split up a buffered array, without decoding it?
+                //  binary_encoding.split_array_encoded_buffer
+                //   splits it to other encoded buffers - gets the items out of the array
+                //console.log('arr', arr);
+
+                // Could the data have been wrongly double-encoded as an array while sending server-side?
+                //  Possibly to compensate for a previous decoding problem?
+
+                // So don't have these again encoded as arrays?
+                //  We know they are arrays, so just decode them into that by default.
+
+                // Maybe the result has been needlessly double-encoded.888
+
+                //console.log('obs_decode_message_envelope buf', buf);
+                //console.log('obs_decode_message_envelope buf.length', buf.length);
+
+                // Buffers are encoded within the envelope.
+
+
+
+
+                // Looks like a likely bug with how it was encoded on the server.
+
+
+                // Standard decode of what's in the envelope
+                let decoded = Binary_Encoding.decode_buffer(buf)[0];
+
+                // Getting an error here if there is still a kp on the server?
+                //  First key needs to be encoded as a buffer?
+
+
+
+                //console.log('decoded', decoded);
+
+                // Still need server-side kp removal from result?
+                //  Then 
+                let decoded2 = Binary_Encoding.decode_buffer(decoded)[0];
+
+                //console.log('* decoded2', decoded2);
+
+                //let decoded_3 = Binary_Encoding.decode_buffer(decoded2[0]);
+
+                // Yes these buffers need to be available for decoding.
+                //  Could the first and last key lookup be going wrong?
+
+
+
+
+                //console.log('decoded_3', decoded_3);
+
+                // Envelope should have an array of items inside.
+                //  Those items may stay encoded.
+                //   Items to stay encoded need to be encoded with a Buffer type
+
+
+                res.raise('next', decoded2);
+            });
+            obs.on('error', () => res.raise('error'));
+            obs.on('complete', () => res.raise('complete'));
+            return res;
+        }
+
+
+
+        // An observable then for decoding the message envelope.
+        //  Then we may still have the encoded data and could run it through a decode message data process.
+        //  For the moment, we want to get the data back in the same format that the server gives when directly calling a function, still not decoding.
+        //   Decoding the message envelope is different to decoding the message itself.
+
+
+
+        // obs_separate
+
+        // Then decoding messages is a different matter.
+
+        // 
+
+        // and could decode the key search beginning and also the internal buffers.
+        //  
+
+
+        let obs_send = obs_decode_message_envelope(obs_unpage_buffer(this.send(GET_TABLE_KEY_SUBDIVISIONS, [this.model.table_id(table)])));
+
+        // could add a getter for the 'decoded' property.
+
+
+
+        //obs.decode = function
+
+
+
+        // Decoding option.
+
+        //let res;
+        // and then decode?
+
+
+        /*
+        decode = false;
+        if (decode) {
+            // 
+
+            res = Model.encoding.obs_decode(obs_send);
+        } else {
+            res = obs_send;
+        }
+        */
+
+        // Possibly could wrap the whole observable?
+
+        // Want the page->separate observable processor.
+        //  We don't decode the values here, so they are all stuck together.
+        //  Look at receiving pages of data, then un-paging them as they come back to the client.
+
+
+
+        console.log('get_table_key_subdivisions !!callback', !!callback);
         if (callback) {
+
+            // callbackify(...)
+
+
 
             let res_all = [];
 
             obs_send.on('next', data => {
-                //console.log('* data', data);
+                console.log('client get_table_key_subdivisions data', data);
+                // 
                 res_all.push(data);
-
-
+                //throw 'stop';
                 // are getting pages back here
-
             });
             obs_send.on('complete', () => {
                 callback(null, res_all);
@@ -1287,11 +1553,6 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
         } else {
             return obs_send;
         }
-
-
-
-
-
     }
 
 
@@ -2490,7 +2751,19 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
      * @param {any} callback
      * @memberof NextlevelDB_Client
      */
-    count_table_records(table_name, callback) {
+
+    // This would be nice with a limit param.
+    //  Time limit / record count limit.
+
+    count_table_records(table_name, limit = -1, callback) {
+
+
+        let a = arguments,
+            l = a.length;
+        if (l === 2) {
+            callback = a[1];
+            limit = -1;
+        }
 
         // use a get table id promise
 
@@ -2507,7 +2780,8 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
 
             // But the counts should not be as an array
 
-            let obs_count_records = this.count_records_by_key_prefix(kp);
+            // A version with a limit would be nice.
+            let obs_count_records = this.count_records_by_key_prefix(kp, limit);
 
             let t_obs_count_records = tof(obs_count_records);
             //console.log('t_obs_count_records', t_obs_count_records);
@@ -2521,7 +2795,7 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
 
             // That way we could pass one observable returning function another observable to send results to, rather than a callback.
 
-
+            console.log('obs_res, obs_count_records', obs_res, obs_count_records);
 
             obs_throughput(obs_res, obs_count_records);
 
@@ -2714,7 +2988,7 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
      */
     get_table_index_selection_records(table_name, arr_index_selection, callback) {
 
-        throw 'NYI';
+        throw 'get_table_index_selection_records NYI';
         if (this.model) {
             var table = this.model.map_tables[table_name];
             if (table) {
@@ -3365,6 +3639,8 @@ if (require.main === module) {
             throw err;
         } else {
 
+            console.log('Client started');
+
             // Automatically loading the core on start makes sense.
 
 
@@ -3554,7 +3830,10 @@ if (require.main === module) {
                     if (err) {
                         throw err;
                     } else {
-                        console.log('subdivisions', subdivisions);
+                        //console.log('subdivisions', subdivisions);
+                        console.log('Subdivisions');
+                        console.log('------------');
+                        each(subdivisions, subdivision => console.log(subdivision));
                     }
                 });
 
