@@ -8,7 +8,7 @@
         "lang-mini": "^0.0.5",
         "moment": "^2.21.0",
         "my-config": "^2.0.0",
-        "nextleveldb-model": "^0.0.39",
+        "nextleveldb-model": "^0.0.40",
         "recursive-readdir": "^2.2.2",
         "request": "^2.85.0",
         "single-line-log": "^1.1.2",
@@ -24,5 +24,5 @@
         "type": "git",
         "url": "https://github.com/metabench/nextleveldb-client.git"
     },
-    "version": "0.0.45"
+    "version": "0.0.46"
 }

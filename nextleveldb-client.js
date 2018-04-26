@@ -1,6 +1,20 @@
 // Possibly makes it unusable in the browser.
 //  Could possibly have node-nextleveldb-client
 
+// Because of errors, looks like creating new instances of the server may be the right course of action?
+//  Seems like new currency was not added at all, while new market was added incorrectly.
+
+//  Probably need to do more work in the assets-client (which I have not done much on recently) to make a smooth an reliable experience adding a new Bittrex currency and its associated markets.
+//  Maybe porting to CockroachDB is the right approach... but really feel the need to solve this problem to get the data running smoothly through what I have here.
+//   Slowly and carefully is the approach to recovering / fixing data on the various existing servers.
+
+// Assets client could be used to check specific functionality is working OK.
+//  Have long-winded and laborious methods to resolve the problems.
+
+
+
+
+
 const fs = require("fs");
 const os = require("os");
 
@@ -1061,6 +1075,9 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
      */
 
     get_records_by_key_prefix_up_to(key_prefix, limit, callback) {
+
+
+
         this.ll_get_records_by_key_prefix_up_to(key_prefix, limit, (err, encoded_records) => {
             if (err) {
                 callback(err);
@@ -1118,6 +1135,7 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
             sig = get_a_sig(a);
 
         //console.log('get_table_records sig', sig);
+        //throw 'stop';
 
         if (sig === '[s]') {
             // Record paging, size 1024
@@ -1177,8 +1195,16 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
         // get_table_kp_by_name
 
 
-        let obs_res;
+        //let obs_res;
 
+        let obs_res = new Evented_Class();
+
+
+
+
+
+
+        /*
 
         if (!callback) {
             // A temporary observer, because we don't have the params yet?
@@ -1187,7 +1213,10 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
 
             obs_res = new Evented_Class();
 
+            // 
+
         }
+        */
 
         this.get_table_kp_by_name(table_name, (err, kp) => {
             if (err) {
@@ -1207,8 +1236,17 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
                     //throw 'stop';
 
                     let obs = this.get_records_by_key_prefix(kp, paging, decode, remove_kps);
+                    obs.unpaged = obs_res.unpaged;
+
                     //return obs;
-                    let data_pages = [];
+                    //let data_pages = [];
+
+                    //return obs_res;
+
+                    // Need to be able to pass through these results....
+
+                    //obs_res.
+
 
 
 
@@ -1234,13 +1272,19 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
                         //let all_records = [].concat.apply([], data_pages);
                         //console.log('all_records.length', all_records.length);
                     });
+
+                    obs_res.stop = obs.stop;
+
+
                 }
             }
         });
 
+
         if (!callback) {
             return obs_res;
         }
+
 
 
         /*
@@ -1714,6 +1758,31 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
         }
     }
 
+    get_table_last_key(table_name, callback) {
+        let table_id = this.model.table_id(table_name);
+        var kp = table_id * 2 + 2;
+        var buf_key = xas2(kp).buffer;
+        this.ll_get_last_key_beginning(buf_key, (err, res_last_key) => {
+            if (err) {
+                callback(err);
+            } else {
+                console.log('res_last_key', res_last_key);
+                callback(null, res_last_key);
+            }
+        })
+    }
+
+    get_table_last_id(table_name, callback) {
+        this.get_table_last_key(table_name, (err, last_key) => {
+            if (err) {
+                callback(err);
+            } else {
+                console.log('last_key', last_key);
+
+            }
+        })
+    }
+
     // count_table_selection
     //  count_table_key_selection
 
@@ -1758,6 +1827,10 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
                 var kp = table.key_prefix;
                 //
 
+                //console.log('kp', kp);
+
+                // ll get records by key prefix - maybe it should do more decoding of the results buffer? 
+
                 this.ll_get_records_by_key_prefix(kp + 1, callback);
             } else {
                 callback("Table " + table_name + " not found");
@@ -1780,14 +1853,132 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
             if (err) {
                 callback(err);
             } else {
-                var decoded_index_records = Model_Database.decode_model_rows(
-                    index_records
-                );
+                // That ll function did not split up the records.
+                var row_buffers = Binary_Encoding.get_row_buffers(index_records);
+
+
+                var decoded_index_records = Model_Database.decode_model_rows(row_buffers);
                 //console.log('decoded_index_records', decoded_index_records);
                 callback(null, decoded_index_records);
             }
         });
     }
+
+
+
+    // cs = client_side
+
+    cs_update_record_update_indexes(arr_record_current, arr_record_new, callback) {
+        // Need to work out what the index changes to make are.
+        //  will need to delete the old index records, replace them with new ones.
+
+        // May need more low-level functions on the server to do this.
+
+        //ll_delete_by_key
+        //ll_delete_by_keys
+
+        // Then tell it to reload the model afterwards? Only in some cases, best not to complicate this fn.
+
+        // Need to be able to change misplaced records.
+        //  Once we have changed currency records back to how they should be, we can examine if we have all the market records we should have.
+
+        // I think this data8 problem needs strong diagnosis and fixing. Get it back in working order and get the data from it.
+        //  Do need to work on some more general database operations to fix it.
+        //   Most of the datasets will be fine anyway I expect.
+
+        // Also, creating a new db and importing the old data from it seems best.
+        //  A sync method that does not only sync from the source for everything, it updates the source with corrected structural information.
+
+        // Sharding at key subdivisions makes a lot of sense.
+        //  Keys which begin with x are in shard group sg(x).
+        //   There would not be all that many shard groups. No more than a machine can easily have port connections. Then later on we could have sharding within a shard group.
+        //    Sharding would operate according to a different formula at that level.
+
+
+        // Could see if there are any records that refer to this.
+        //  If there are, then in some cases changing that reference would be best.
+        //   But not in others.
+
+        // It looks like it's worth setting up data9 and data10, and using them to import data from others, such as data8.
+
+        // Carrying out some fixes on data8 will definitely be worth it.
+        //  Want it to be ready for the next bittrex currency with fixed code and data in place.
+
+
+
+
+        let model = this.model;
+        let model_table = this.model.map_tables_by_id[(arr_record_current[0][0] - 2) / 2];
+
+
+
+        let indexes = model.create_index_records_by_record(arr_record_current);
+        console.log('indexes', indexes);
+
+        let new_indexes = model.create_index_records_by_record(arr_record_new);
+        console.log('new_indexes', new_indexes);
+
+        let old_keys = [arr_record_current[0]].concat(indexes);
+        console.log('old_keys', old_keys);
+
+        // then put a batch of new rows.
+        //  The indexes would need to be encoded without values.
+
+        console.log('arr_record_current', arr_record_current);
+
+        let new_rows = [arr_record_new].concat(new_indexes);
+        console.log('new_rows', new_rows);
+
+        // would be nice to batch operations to the server.
+        //  transactions would be cool, it would need to keep a reversable log.
+
+        // Don't want this yet.
+        //  Check against a map of all the bittrex supplied currency codes.
+        //   Seeing which currencies are missing will be useful for retrieval of longer term data from other servers.
+        //    Will attempt diagnose only on them.
+        //     Will also identify uncorrupted record sets this way.
+
+        // It looks like it will be possible to methodically work through data recovery to get mostly working data sources
+        //  Update various currency indexes to what they originally would have been.
+        //   Check that the market records and indexes are correct.
+
+        // Checking for orphan records.
+        // Checking for index records which contain keys that are encoded incorrectly.
+
+        // scan_key_range_malformed_indexes
+        //  could be done server-side, and only returns indexes which have got a problem.
+
+        // Getting back access to the data that has been harvested for over a month will be extremely useful.
+        //  Will do comprehensive testing, then a comprehensive upgrade that will carry out diagnosis upon start.
+
+
+        //this.ll_delete_and_put(old_keys, new_rows, callback);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        //this.ll_delete_and_put(old_keys, new_rows, callback);
+
+        // Then next when it starts up we need to check that some existing / referenced currency records are there.
+        //  Finding missing currency record currency codes would be useful.
+
+        // It would use bittrex watcher to download the currency codes.
+
+
+
+
+    }
+
 
     /**
      *
@@ -2319,17 +2510,17 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
                                             //Model_Database.encode_index_key(table_indexes_kp, table_index_id,
                                         } else {
                                             //console.trace();
-                                            console.log('record', record);
-                                            console.log('arr_record', arr_record);
+                                            //console.log('record', record);
+                                            //console.log('arr_record', arr_record);
 
                                             let index_value_field_ids = record[1];
-                                            console.log('index_value_field_ids', index_value_field_ids);
-                                            console.log('size_diff', size_diff);
+                                            //console.log('index_value_field_ids', index_value_field_ids);
+                                            //console.log('size_diff', size_diff);
 
                                             let arr_indexed_values = [];
                                             index_value_field_ids.forEach(id => {
                                                 arr_indexed_values.push(arr_record[id - size_diff]);
-                                            })
+                                            });
 
                                             let encoded_index_key = Model_Database.encode_index_key(
                                                 table_id * 2 + 3,
@@ -2337,7 +2528,7 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
                                                 arr_indexed_values
                                             );
                                             arr_buf_index_lookup_keys.push(encoded_index_key);
-                                            console.log('encoded_index_key', encoded_index_key);
+                                            //console.log('encoded_index_key', encoded_index_key);
                                             //throw "NYI";
                                         }
 
@@ -3004,6 +3195,26 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
     }
 
 
+    // Want a matching function.
+    //  Won't search through index.
+    //  Get table records, apply matching function to these table records.
+
+    // hard to do this efficiently client-side.
+    //  hard to get a matching function over to the server.
+
+    // an OO result match could be ok. will match against the field names / indexes
+    //  Then the matching info will be sent from the client to the server.
+    //   Matching info could be part of extended options, as it operates on the results set.
+
+
+
+    // matching records against values for retrieval seems important
+    //  seems a lot like a 'where' clause in SQL.
+
+
+
+
+
 
     select_from_table(table, arr_fields, paging, decode = true, callback) {
 
@@ -3090,6 +3301,13 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
 
     }
 
+    // get table record by index lookup
+    // get table record where, full table scan
+
+    // And what about getting an OO record class?
+    //  These records here are kv arrays.
+
+    // Could make more flexibility on return types.
 
 
     get_table_record(table_name, arr_key, callback) {
@@ -3118,6 +3336,19 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
                 })
             }
         })
+    }
+
+    get_by_arr_key(arr_key, callback) {
+        // Would perhaps get an index record back.
+        //  The encoding of this is a bit trickier.
+        //   The index records are just stored in keys.
+        //    Its the last value of the index record which is the id for the item.
+
+        throw 'NYI';
+
+        // Seems maybe tricky for operations from the DB that return both index and normal records together?
+
+
     }
 
 
@@ -3350,6 +3581,9 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
         return res;
     }
 
+
+    // get the record itself by an index field lookup
+
     get_table_record_field_by_index_lookup(
         table_name,
         field_name,
@@ -3496,6 +3730,70 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
             }
         });
     }
+
+
+
+    // scan table records
+    error_scan_table(table_name) {
+        //let table_id = this.model.table_id(table);
+
+        //console.log('');
+        //console.log('pre get_table_records');
+        let obs_records = this.get_table_records(table_name, false);
+        obs_records.unpaged = true;
+        //obs_records.
+        // 
+
+        //console.log('2) obs_records.unpaged', obs_records.unpaged);
+
+
+        //console.log('3) obs_records.unpaged', obs_records.unpaged);
+        // get_table_records should automatically unpage
+
+
+
+
+        let res = new Evented_Class();
+        let error_records = [];
+        obs_records.on('next', record => {
+            //console.log('record', record);
+
+
+
+            try {
+
+                let decoded = Model_Database.decode_model_row(record);
+
+
+                //let decoded = Model_Database.decode_model_row(record);
+
+
+            } catch (err) {
+                error_records.push(record);
+            }
+        });
+
+        obs_records.on('complete', () => {
+            //console.log('error_records', error_records);
+
+            // And can try to decode the values of each of them.
+
+            each(error_records, error_record => {
+                let d_value = Binary_Encoding.decode_buffer(error_record[1]);
+                console.log('d_value', d_value);
+                //console.log('decoded', decoded);
+
+                res.raise('next', error_record);
+            });
+
+            res.raise('complete');
+
+        });
+
+        return res;
+        //return obs_records;
+    }
+
 }
 
 var last_backup_path = callback => {
@@ -3623,12 +3921,12 @@ if (require.main === module) {
 
 
     console.log('access_token', access_token);
-    var server_data3 = config.nextleveldb_connections.data3;
-    server_data3.access_token = access_token;
+    var server_data8 = config.nextleveldb_connections.data8;
+    server_data8.access_token = access_token;
 
 
 
-    var lc = new NextlevelDB_Client(local_info);
+    var lc = new NextlevelDB_Client(server_data8);
 
     // Looks like the level client keeps itself open.
     //  console.log('pre start');
@@ -3640,6 +3938,10 @@ if (require.main === module) {
         } else {
 
             console.log('Client started');
+
+            console.log('icpt', lc.model.index_count_per_table);
+
+
 
             // Automatically loading the core on start makes sense.
 
@@ -3663,8 +3965,8 @@ if (require.main === module) {
                                 console.trace();
                                 throw err;
                             } else {
-                                console.log('bittrex markets');
-                                console.log('records', records);
+                                //console.log('bittrex markets');
+                                //console.log('records', records);
                                 // get the field items as 
 
                                 lc.get_table_fields_records('bittrex markets', (err, table_fields_records) => {
@@ -3712,13 +4014,13 @@ if (require.main === module) {
                 // What about with no decoding.
                 //  Can not handle it client-side fast enough
 
-                let obs_table_records = lc.get_table_records(table_name, false);
+                let obs_table_records = lc.get_table_records(table_name, true);
+                obs_table_records.unpaged = true;
 
                 obs_table_records.on('next', data => {
-                    //console.log('data', data);
+
+                    console.log('data', data);
                     console.log('data.length', data.length);
-
-
 
                     //data_pages.push(data);
                     //obs_res.raise('next', data);
@@ -3741,6 +4043,7 @@ if (require.main === module) {
 
             }
             //test_paged_get_table_records('bittrex market summary snapshots');
+            //test_paged_get_table_records('bittrex currencies');
 
             let test_paged_get_table_keys = table_name => {
 
@@ -3813,6 +4116,43 @@ if (require.main === module) {
             }
             //test_get_table_keys();
 
+            let test_get_table_index_records = () => {
+                let table_name = 'bittrex currencies';
+                lc.get_table_index_records(table_name, (err, index_records) => {
+                    if (err) {
+                        throw err;
+                    } else {
+                        console.log('*35 ' + table_name + ' index_records');
+                        each(index_records, index_record => {
+                            console.log('index_record', index_record);
+                        })
+                    }
+                })
+            }
+            //test_get_table_index_records();
+
+
+            let scan = () => {
+                //let obs_scan = lc.error_scan_table('bittrex currencies');
+
+                // do this without decoding.
+                //  error scan table needs to get the rows without decoding.
+                //  seems best to use this as an option on the result, save param complexity.
+
+
+
+                let obs_scan = lc.error_scan_table('bittrex markets');
+                obs_scan.on('next', data => {
+                    console.log('scan data', data);
+
+                    let decoded_data_value = Binary_Encoding.decode_buffer(data[1]);
+                    console.log('decoded_data_value', decoded_data_value);
+
+
+                })
+            }
+            //scan();
+
 
             let test_get_table_key_subdivisions = () => {
 
@@ -3838,7 +4178,11 @@ if (require.main === module) {
                 });
 
             }
-            test_get_table_key_subdivisions();
+            //test_get_table_key_subdivisions();
+
+            // Check the number of indexes for each table.
+
+
 
         }
     });
