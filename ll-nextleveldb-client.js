@@ -840,17 +840,17 @@ class LL_NextLevelDB_Client extends Evented_Class {
             response_type_code;
 
         this.ws_response_handlers[idx] = (obj_message, idx) => {
-            console.log('obj_message', obj_message);
-            console.log('idx', idx);
+            //console.log('obj_message', obj_message);
+            //console.log('idx', idx);
 
             [response_type_code, pos] = xas2.read(obj_message, pos);
             //console.log('PAGING_NONE obj_message', obj_message);
-            console.log('response_type_code', response_type_code);
+            //console.log('response_type_code', response_type_code);
 
             // check to see if we get an error response.
             let buf_the_rest = Buffer.alloc(obj_message.length - pos);
             obj_message.copy(buf_the_rest, 0, pos);
-            console.log('buf_the_rest', buf_the_rest);
+            //console.log('buf_the_rest', buf_the_rest);
 
             if (response_type_code === ERROR_MESSAGE) {
                 callback(buf_the_rest);
@@ -1910,7 +1910,7 @@ class LL_NextLevelDB_Client extends Evented_Class {
         //this.websocket_connection.sendBytes(buf_2);
         this.websocket_client.send(buf_2);
 
-        console.log('1) res.unpaged', res.unpaged);
+        //console.log('1) res.unpaged', res.unpaged);
 
         // Incorporating a stop function.
         //  Want it to get a response to the stop function.
@@ -2331,7 +2331,7 @@ class LL_NextLevelDB_Client extends Evented_Class {
             sig = get_a_sig(a);
         let buf_key_prefix;
 
-        console.log('ll_get_records_by_key_prefix sig', sig);
+        //console.log('ll_get_records_by_key_prefix sig', sig);
 
         if (sig === '[n,o]') {
             buf_key_prefix = xas2(key_prefix).buffer;
@@ -2402,8 +2402,8 @@ class LL_NextLevelDB_Client extends Evented_Class {
         var buf_l = Buffer.concat([buf_key_prefix, buf_0]);
         var buf_u = Buffer.concat([buf_key_prefix, buf_1]);
 
-        console.log('buf_l', buf_l);
-        console.log('buf_u', buf_u);
+        //console.log('buf_l', buf_l);
+        //console.log('buf_u', buf_u);
 
         // This looks like it will need to handle index records too.
 
@@ -2880,7 +2880,7 @@ class LL_NextLevelDB_Client extends Evented_Class {
         // the lengths of the buffers too...
         var buf_query = Buffer.concat([buf_command, paging.buffer, xas2(buf_l.length).buffer, buf_l, xas2(buf_u.length).buffer, buf_u]);
 
-        console.log('!!callback', !!callback);
+        //console.log('!!callback', !!callback);
 
         if (callback) {
             // Do this using the callback style call.
@@ -2937,7 +2937,7 @@ class LL_NextLevelDB_Client extends Evented_Class {
 
             // Want this to be stoppable.
 
-            console.log('obs.unpaged', obs.unpaged);
+            //console.log('obs.unpaged', obs.unpaged);
             return obs;
             //throw 'NYI';
 
