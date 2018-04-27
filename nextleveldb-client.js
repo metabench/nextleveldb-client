@@ -36,6 +36,7 @@ const xas2 = require("xas2");
 const Binary_Encoding = require("binary-encoding");
 const Model = require("nextleveldb-model");
 const Model_Database = Model.Database;
+const database_encoding = Model.encoding;
 
 const Paging = Model.Paging;
 
@@ -1759,13 +1760,19 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
     }
 
     get_table_last_key(table_name, callback) {
+
+
         let table_id = this.model.table_id(table_name);
         var kp = table_id * 2 + 2;
         var buf_key = xas2(kp).buffer;
+
+        console.log('pre ll_get_last_key_beginning ', buf_key);
         this.ll_get_last_key_beginning(buf_key, (err, res_last_key) => {
             if (err) {
                 callback(err);
             } else {
+                // Does not decode the result here.
+
                 console.log('res_last_key', res_last_key);
                 callback(null, res_last_key);
             }
@@ -1778,6 +1785,19 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
                 callback(err);
             } else {
                 console.log('last_key', last_key);
+
+                let decoded_last_key = database_encoding.decode_key(last_key);
+                console.log('decoded_last_key', decoded_last_key);
+                decoded_last_key.shift();
+
+                if (decoded_last_key.length === 1) {
+                    callback(null, decoded_last_key[0]);
+                } else {
+                    callback(null, decoded_last_key);
+                }
+
+
+
 
             }
         })

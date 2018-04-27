@@ -834,18 +834,42 @@ class LL_NextLevelDB_Client extends Evented_Class {
 
     setup_binary_no_paging_no_decode_handler(idx, callback) {
 
-        this.ws_response_handlers[idx] = (obj_message) => {
+        // The message has had its idx removed already. Not sure that's best.
+
+        let pos = 0,
+            response_type_code;
+
+        this.ws_response_handlers[idx] = (obj_message, idx) => {
+            console.log('obj_message', obj_message);
+            console.log('idx', idx);
+
             [response_type_code, pos] = xas2.read(obj_message, pos);
             //console.log('PAGING_NONE obj_message', obj_message);
-            //console.log('response_type_code', response_type_code);
+            console.log('response_type_code', response_type_code);
 
             // check to see if we get an error response.
             let buf_the_rest = Buffer.alloc(obj_message.length - pos);
             obj_message.copy(buf_the_rest, 0, pos);
+            console.log('buf_the_rest', buf_the_rest);
 
             if (response_type_code === ERROR_MESSAGE) {
                 callback(buf_the_rest);
+            } else if (response_type_code === BINARY_PAGING_NONE) {
+
+
+
+                console.log('buf_the_rest', buf_the_rest);
+                let decoded = Binary_Encoding.decode_buffer(buf_the_rest)[0];
+
+                console.log('decoded', decoded);
+                callback(null, decoded);
+
+
+                //callback(buf_the_rest);
             } else {
+
+                // 
+
                 callback(null, buf_the_rest);
             }
 
@@ -1919,16 +1943,19 @@ class LL_NextLevelDB_Client extends Evented_Class {
     cb_send_command(message_type_id, message_args, callback) {
         // No paging
 
+        let message_id = this.id_ws_req++;
+
         if (!Array.isArray(message_args)) {
             message_args = [message_args];
         }
 
-        let buf = Buffer.concat([xas2(message_type_id).buffer, xas2(NO_PAGING).buffer, Binary_Encoding.encode_to_buffer(message_args)]);
+        let buf = Buffer.concat([xas2(message_id).buffer, xas2(message_type_id).buffer, xas2(NO_PAGING).buffer, Binary_Encoding.encode_to_buffer(message_args)]);
 
-        //console.log('buf', buf);
+        //console.log('* buf', buf);
 
-        this.setup_binary_no_paging_no_decode_handler(this.id_ws_req++, callback);
+        this.setup_binary_no_paging_no_decode_handler(message_id, callback);
 
+        //console.log('* pre send buf', buf);
         this.websocket_client.send(buf);
 
 
