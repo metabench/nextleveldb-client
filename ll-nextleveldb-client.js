@@ -53,6 +53,8 @@ const request = require('request');
 const protocol = 'http://';
 
 const path = require('path');
+const Key_List = Model.Key_List;
+
 
 
 // Will renumber these at some point.
@@ -82,6 +84,7 @@ const LL_GET_RECORDS_IN_RANGE_UP_TO = 10;
 const LL_FIND_COUNT_TABLE_RECORDS_INDEX_MATCH = 11;
 const INSERT_TABLE_RECORD = 12;
 const INSERT_RECORDS = 13;
+const DELETE_RECORDS_BY_KEYS = 18;
 const ENSURE_TABLE = 20;
 const ENSURE_TABLES = 21;
 const TABLE_EXISTS = 22;
@@ -816,15 +819,12 @@ class LL_NextLevelDB_Client extends Evented_Class {
             // The response message class will deconstruct the pages.
             //  Would be possible to use an unpage observer; We want to keep extra params to do with paging out of here for the moment. 
 
-
-
             // and if it's the last message, get rid of the response handler
             console.log('response_message.is_last', response_message.is_last);
 
             if (response_message.is_last) {
                 res.raise('complete');
             }
-
         }
 
         return res;
@@ -1943,13 +1943,122 @@ class LL_NextLevelDB_Client extends Evented_Class {
     cb_send_command(message_type_id, message_args, callback) {
         // No paging
 
+        // The message args could be or contain a key set.
+        //  The message args being a key set requiring a specific type of encoding?
+
         let message_id = this.id_ws_req++;
+        // Better to use a Command_Message
+        //let cm = new Command_Message();
+
+        // The message args could be something that renders directly.
+        //  Also message encoding type / communications options.
+
+        // Some kind of buffer type int will help.
+        //  Make it so it's very clear what kind of data a message holds.
+
+        // Could use the JS Set object... exept they are all keys.
+
+        // check if the message args are convertable to a buffer.
+        //  A set of keys that is easy to put together would be great.
+        //  Should become standard in some ways, and the Key_Set object would make the code more readable.
+
+        // Would help to power ops like deleting a bunch of keys, checking which keys are present.
+
+
+        // More advanced typing of the message args.
+        //  They may be a list of keys.
+        //  Not sure we want more complexity here though.
+
+        // Getting params to the server so the server knows they are a collection of keys will be very helpful.
+
+        // Try being able to encode and decode keys easily.
+        //  Likely that keys would be held in encoded form.
+        //   Would have a few int variables that show what part of the key is where
+        //    Where each field is within the key.
+        //     Flattened?
+        //   There can be compound fields within keys.
+
+
+
+
+        // if the message args are all buffers...
+
+        // Just given one buffer...
+
+        // A version to send this as a Key_List?
+
+        let buf_msg_args;
+
+        console.log('message_args', message_args);
+
 
         if (!Array.isArray(message_args)) {
-            message_args = [message_args];
+
+
+            // could it be a buffer
+
+            //if ()
+
+            //console.log('message_args', message_args);
+            //console.log('message_args' + message_args);
+
+            // the message args could be a buffer backed key list.
+
+            // Trouble is, Buffer has .buffer
+
+            console.log('!!message_args.buffer', !!message_args.buffer);
+
+
+
+
+
+            if (message_args.buffer) {
+
+
+                if (message_args instanceof Buffer) {
+                    console.log('it is a buffer');
+                    buf_msg_args = Binary_Encoding.encode_to_buffer([message_args]);
+                } else {
+                    buf_msg_args = message_args.buffer;
+                }
+
+                // A way of declaring that a bunch of encoded items together are a key list
+                //  That way they can be decoded as a key list.
+                //   They would be in the messages encoded as keys, want an easy to use an unified way for sending these keys.
+
+                // Then they will be decoded as Key_List on the server. Would then be able to check the type of the decoded data.
+                //  That way the server handler functions could each use the same method to decode data.
+                //   It would know what type of data to expect in various situations, and possibly do some instanceof checking to see what data types it's been given,
+                //    maybe doing some conversions on the server.
+
+                // Key_List, buffer backed Key and Value will be closer to the way it is within the messages and the DB.
+                //  Will require less encoding and decoding.
+
+
+
+
+
+
+            } else {
+                buf_msg_args = Binary_Encoding.encode_to_buffer(message_args);
+            }
+
+            //throw 'stop';
+
+
+            //message_args = [message_args];
+
+        } else {
+            buf_msg_args = Binary_Encoding.encode_to_buffer([message_args]);
         }
 
-        let buf = Buffer.concat([xas2(message_id).buffer, xas2(message_type_id).buffer, xas2(NO_PAGING).buffer, Binary_Encoding.encode_to_buffer(message_args)]);
+        //console.log('message_args', message_args);
+        //console.trace();
+        //throw 'stop';
+
+        console.log('buf_msg_args', buf_msg_args);
+
+        let buf = Buffer.concat([xas2(message_id).buffer, xas2(message_type_id).buffer, xas2(NO_PAGING).buffer, buf_msg_args]);
 
         //console.log('* buf', buf);
 
@@ -2003,7 +2112,6 @@ class LL_NextLevelDB_Client extends Evented_Class {
         //  assume the client wants individual records.
 
         // observable wrapper
-
 
         // then if we want the results decoded, we can put it through an observable_decode_processor
 
@@ -2258,18 +2366,18 @@ class LL_NextLevelDB_Client extends Evented_Class {
         /*
 
         
-        next — Called each time the observable emits a value.
-        error — Called when the observable encounters an error or fails to generate the data to emit. After an error, no further values will be emitted, and `completed` will not be called.
-        completed — Called after it has called `next` for the final time, but only if no errors were encountered.
+            next — Called each time the observable emits a value.
+            error — Called when the observable encounters an error or fails to generate the data to emit. After an error, no further values will be emitted, and `completed` will not be called.
+            completed — Called after it has called `next` for the final time, but only if no errors were encountered.
 
-        this.send_binary_message(buf_query, (err, res_binary_message) => {
-            if (err) {
-                callback(err);
-            } else {
-                callback(null, res_binary_message);
-            }
-        });
-        */
+            this.send_binary_message(buf_query, (err, res_binary_message) => {
+                if (err) {
+                    callback(err);
+                } else {
+                    callback(null, res_binary_message);
+                }
+            });
+            */
 
 
     }
@@ -2972,6 +3080,33 @@ class LL_NextLevelDB_Client extends Evented_Class {
 
     }
 
+    ll_delete_records_by_keys(arr_keys, callback) {
+        // DELETE_RECORDS_BY_KEYS
+
+        // Would send the keys encoded as an array.
+        //  Using a Key_Set, maybe Key class would help them to be encoded easily, and provide more readable code because we know that it's a key set.
+
+        // new Key_Set(arr_keys)
+        //  Could give a Key_Set its own constant to identify it.
+        //  
+
+        console.log('DELETE_RECORDS_BY_KEYS arr_keys', arr_keys);
+
+        let kl_keys = new Key_List(arr_keys);
+        console.log('kl_keys', kl_keys);
+        //throw 'stop';
+
+        // Be able to get they keys as decoded arrays.
+
+        //lk_keys.decoded
+
+
+        // then use send command with the key list.
+
+        this.cb_send_command(DELETE_RECORDS_BY_KEYS, kl_keys, callback);
+        //this.cb_send_command(DELETE_RECORDS_BY_KEYS, arr_keys, callback);
+    }
+
     ll_get_first_key_beginning(buf_beginning, callback) {
         // want to send command, getting a callback
 
@@ -2980,6 +3115,9 @@ class LL_NextLevelDB_Client extends Evented_Class {
 
     }
     ll_get_last_key_beginning(buf_beginning, callback) {
+
+
+
         this.cb_send_command(LL_GET_LAST_KEY_BEGINNING, buf_beginning, callback);
     }
 
@@ -3398,8 +3536,8 @@ class LL_NextLevelDB_Client extends Evented_Class {
             delay, paging, decode = true;
         a.l = a.length;
         let sig = get_a_sig(a);
-        console.log('sig', sig);
-        console.log('a.l', a.l);
+        //console.log('sig', sig);
+        //console.log('a.l', a.l);
 
         if (sig === '[]') {
             delay = 1000;
@@ -3467,6 +3605,14 @@ class LL_NextLevelDB_Client extends Evented_Class {
 
     }
 
+
+    // another put function. would load the data into the OO class thing.
+
+
+
+
+
+    // May use Record_List in the future
     /**
      * 
      * 
@@ -3716,14 +3862,14 @@ if (require.main === module) {
     let access_token = config.nextleveldb_access.root[0];
 
     /*
-    var app_config = require('my-config').init({
-        path: path.resolve('./app-config.json') //,
-        //env : process.env['NODE_ENV']
-        //env : process.env
-    });
+        var app_config = require('my-config').init({
+            path: path.resolve('./app-config.json') //,
+            //env : process.env['NODE_ENV']
+            //env : process.env
+        });
     
-    Object.assign(config, app_config);
-    */
+        Object.assign(config, app_config);
+        */
 
 
     // data1

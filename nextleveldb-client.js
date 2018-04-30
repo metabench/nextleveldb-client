@@ -35,6 +35,7 @@ const LL_NextlevelDB_Client = require("./ll-nextleveldb-client");
 const xas2 = require("xas2");
 const Binary_Encoding = require("binary-encoding");
 const Model = require("nextleveldb-model");
+const Record_List = Model.Record_List;
 const Model_Database = Model.Database;
 const database_encoding = Model.encoding;
 
@@ -662,6 +663,26 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
     // Should have more functions that deal with record collections.
     //
 
+
+    // Have a lot of different functions for putting records at the moment.
+
+    // Want to make use of Record_List to handle different ways the dataset can be given.
+    //  It automatically backs its data as a binary buffer.
+
+
+    put(records, callback) {
+        let buf;
+        if (records instanceof Record_List) {
+            buf = records.buffer;
+        } else if (records instanceof Buffer) {
+            buf = records;
+        } else if (Array.isArray(records)) {
+            buf = new Record_List(records).buffer;
+        }
+
+        this.ll_put_records_buffer(buf, callback);
+    }
+
     // Assuming we want to insert the table key prefix into the records.
     // Does not create index items for the records.
     /**
@@ -717,8 +738,39 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
      * @param {any} callback
      * @memberof NextlevelDB_Client
      */
+
+    // Should differentiate between different put levels.
+    // Lowest level could be silent, not raising events.
+
+    // Then standard ll would raise the events
+
+    // Just a little more until the crypto data system is working.
+    //  See if we can sync between Montreal nodes.
+    //  That should be fairly fast.
+
+    // Maybe try a small test suite that creates a db and tries a variety of operations.
+    // Using the client to connect to it, and using the server API directly.
+    //  
+
+
+    // Just a simple put function.
+    //  Can put a single record.
+    //  Can put a bunch of them.
+    //  Eventually paged put functions, where it does it in parts.
+    //   Could split it on the client into multiple puts.
+
+
+
+
+
+
     put_arr_records(arr_records, callback) {
         // encode the records into binary buffer
+
+        //encode_arr_records_to_buffer
+        //  would need to take account of index buffers, which don't have a value.
+
+
 
         console.log("put_arr_records arr_records", arr_records);
 
@@ -761,6 +813,9 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
             }
         }
     }
+
+
+
 
     // or just put table?
 
