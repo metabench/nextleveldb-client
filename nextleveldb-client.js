@@ -602,6 +602,13 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
         });
     }
 
+
+    // Will have validate table indexes function.
+    //  Will first have it on the server.
+
+
+
+
     /**
      *
      *
