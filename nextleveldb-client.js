@@ -36,6 +36,9 @@ const xas2 = require("xas2");
 const Binary_Encoding = require("binary-encoding");
 const Model = require("nextleveldb-model");
 const Record_List = Model.Record_List;
+const Key = Model.BB_Key;
+
+
 const Model_Database = Model.Database;
 const database_encoding = Model.encoding;
 
@@ -162,6 +165,43 @@ let remove_kp = (arr_records) => {
 
 
 
+
+
+const obs_to_cb = (obs, callback) => {
+    let arr_all = [];
+    obs.on('next', data => arr_all.push(data));
+    obs.on('error', err => callback(err));
+    obs.on('complete', () => callback(null, arr_all));
+}
+
+
+const prom_or_cb = (inner_with_cb, opt_cb) => {
+    if (typeof opt_cb !== 'undefined') {
+        inner_with_cb(opt_cb);
+    } else {
+        return new Promise((resolve, reject) => {
+            inner_with_cb((err, res) => {
+                if (err) {
+                    reject(err);
+                } else {
+                    resolve(res);
+                }
+            })
+        })
+    }
+}
+
+const prom_opt_cb = (prom, opt_cb) => {
+    if (opt_cb) {
+        prom.then((res) => {
+            opt_cb(null, res);
+        }, err => {
+            opt_cb(err);
+        })
+    } else {
+        return prom;
+    }
+}
 
 
 
@@ -992,7 +1032,19 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
      * @param {any} callback
      * @memberof NextlevelDB_Client
      */
+
+
+    // Should be able to work as either observable or callback.
+    //  and a function to use the last result of an observable as its final result.
+
+
+
+
+
     count_keys_beginning(buf_key_beginning, callback) {
+        //console.log('count_keys_beginning');
+        //console.log('buf_key_beginning', buf_key_beginning);
+
         var buf_0 = Buffer.alloc(1);
         buf_0.writeUInt8(0, 0);
         var buf_1 = Buffer.alloc(1);
@@ -1002,7 +1054,11 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
         var buf_l = Buffer.concat([buf_key_beginning, buf_0]);
         var buf_u = Buffer.concat([buf_key_beginning, buf_1]);
 
-        this.ll_count_keys_in_range(buf_l, buf_u, callback);
+        if (callback) {
+            this.ll_count_keys_in_range(buf_l, buf_u, callback);
+        } else {
+            return this.ll_count_keys_in_range(buf_l, buf_u);
+        }
     }
 
     // function to get the decoded records by key prefix
@@ -1752,39 +1808,59 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
 
         //  could also look at an array of values.
 
-        var t_value = tof(value);
+        // only will get one record.
 
-        if (!this.model) {
-            console.trace();
-            throw "expected: this.model";
+        // will return promise if no callback is used.
+
+
+        let inner = (callback) => {
+            var t_value = tof(value);
+
+            if (!this.model) {
+                console.trace();
+                throw "expected: this.model";
+            }
+
+            var table_kp = this.model.map_tables[table_name].key_prefix;
+
+            if (t_value === "array") {
+                throw "yet to implement";
+            } else {
+
+                var buf_idx_key = Model_Database.encode_index_key(
+                    table_kp + 1,
+                    index_id, [value]
+                );
+
+                this.ll_get_keys_beginning(buf_idx_key, (err, ll_res) => {
+                    if (err) {
+                        callback(err);
+                    } else {
+                        var decoded_index_key = Model_Database.decode_key(ll_res[0]);
+                        var arr_pk_ref = decoded_index_key.slice(3);
+                        if (arr_pk_ref.length === 1) {
+                            callback(null, arr_pk_ref[0]);
+                        } else {
+                            callback(null, arr_pk_ref);
+                        }
+                    }
+                });
+                //Model.Database.enc
+            }
         }
 
-        var table_kp = this.model.map_tables[table_name].key_prefix;
 
-        if (t_value === "array") {
-            throw "yet to implement";
+        /*
+        if (callback) {
+            inner(callback);
         } else {
 
-            var buf_idx_key = Model_Database.encode_index_key(
-                table_kp + 1,
-                index_id, [value]
-            );
+        }*/
 
-            this.ll_get_keys_beginning(buf_idx_key, (err, ll_res) => {
-                if (err) {
-                    callback(err);
-                } else {
-                    var decoded_index_key = Model_Database.decode_key(ll_res[0]);
-                    var arr_pk_ref = decoded_index_key.slice(3);
-                    if (arr_pk_ref.length === 1) {
-                        callback(null, arr_pk_ref[0]);
-                    } else {
-                        callback(null, arr_pk_ref);
-                    }
-                }
-            });
-            //Model.Database.enc
-        }
+        return prom_or_cb(inner, callback);
+
+
+
     }
 
     /**
@@ -2414,47 +2490,63 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
     // get_table_kv_field_names
 
     get_table_kv_field_names(table_name, callback) {
-        const that = this;
-        const table_fields_kp = TABLE_FIELDS_TABLE_ID * 2 + 2;
-        that.get_table_id_by_name(table_name, (err, table_id) => {
-            if (err) {
-                callback(err);
-            } else {
 
-                //console.log('table_id', table_id);
+        // Have this work as a promise or callback.
 
-                //var akp = [table_fields_id, table_id];
-                let buf = Model_Database.encode_key(table_fields_kp, [table_id]);
+        let inner = callback => {
+            const that = this;
+            const table_fields_kp = TABLE_FIELDS_TABLE_ID * 2 + 2;
+            that.get_table_id_by_name(table_name, (err, table_id) => {
+                if (err) {
+                    callback(err);
+                } else {
 
-                that.get_records_by_key_prefix(buf, (err, fields_records) => {
-                    if (err) {
-                        callback(err);
-                    } else {
-                        //console.log('fields_records', fields_records);
+                    //console.log('table_id', table_id);
 
-                        let res_keys = [];
-                        let res_values = [];
-                        let res = [res_keys, res_values];
-                        let is_pk;
+                    //var akp = [table_fields_id, table_id];
+                    let buf = Model_Database.encode_key(table_fields_kp, [table_id]);
 
-                        // So the fields records just have values...?
-                        each(fields_records, record => {
-                            //console.log('record', record);
 
-                            is_pk = record[1][2];
-                            if (is_pk) {
-                                res_keys.push(record[1][0]);
-                            } else {
-                                res_values.push(record[1][0]);
-                            }
-                        });
+                    // Then need to decode the records.
+                    // Would be nicer to use an observable here, as we call a function on each record we get.
 
-                        callback(null, res);
-                    }
-                });
-            }
-        });
-        //that.ll_get_t
+                    // With decoding as a default?
+
+                    that.get_records_by_key_prefix(buf, true, (err, fields_records) => {
+                        if (err) {
+                            callback(err);
+                        } else {
+                            console.log('fields_records', fields_records);
+
+                            let res_keys = [];
+                            let res_values = [];
+                            let res = [res_keys, res_values];
+                            let is_pk;
+
+                            // So the fields records just have values...?
+                            each(fields_records, record => {
+                                //console.log('record', record);
+
+                                is_pk = record[1][2];
+                                if (is_pk) {
+                                    res_keys.push(record[1][0]);
+                                } else {
+                                    res_values.push(record[1][0]);
+                                }
+                            });
+
+                            callback(null, res);
+                        }
+                    });
+                }
+            });
+            //that.ll_get_t
+        }
+
+
+        return prom_or_cb(inner, callback);
+
+
     }
 
     count_table_pk_fields_by_table_id(table_id, callback) {
@@ -3212,19 +3304,39 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
         })
     }
 
+
+
     get_table_selection_records(table_name, arr_key_selection, callback) {
-        var that = this;
-        that.get_table_id_by_name(table_name, (err, table_id) => {
-            if (err) {
-                callback(err);
-            } else {
-                var buf = Model_Database.encode_key(
-                    table_id * 2 + 2,
-                    arr_key_selection
-                );
-                that.get_records_by_key_prefix(buf, callback);
-            }
-        });
+
+        // This would be nicer if it uses an observable to get a number of records.
+        //  If it has some observable util functions where it normally processes as an observable, but then can be run as a callback.
+
+        // May be worth putting into lang-mini
+
+        //let res = new Evented_Class;
+
+
+        let table_id = this.model.table_id(table_name);
+        console.log('table_id', table_id);
+        console.log('arr_key_selection', arr_key_selection);
+
+        var buf = Model_Database.encode_key(
+            table_id * 2 + 2,
+            arr_key_selection
+        );
+
+        // And does not decode the records.
+
+        let res = this.get_records_by_key_prefix(buf);
+
+        if (callback) {
+            // obs_to_cb(res);
+            console.log('using obs_to_cb');
+            obs_to_cb(res, callback);
+
+        } else {
+            return res;
+        }
     }
 
     // Selecting from the index...
@@ -3237,8 +3349,18 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
      * @param {any} callback
      * @memberof NextlevelDB_Client
      */
-    get_table_selection_record_count(table_name, arr_index_selection, callback) {
-        if (this.model) {
+    count_table_selection_records(table_name, arr_index_selection, callback) {
+
+        // accept callback
+        //  observable would be better, getting counts as it progresses.
+
+        // can rely on there being a Model with correct core now.
+
+        console.log('count_table_selection_records table_name', table_name);
+
+
+
+        if (callback) {
             var table = this.model.map_tables[table_name];
             if (table) {
                 var kp = table.key_prefix;
@@ -3248,9 +3370,30 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
                 callback("Table " + table_name + " not found");
             }
         } else {
+            // an observable will be the result.
+
+            var table = this.model.map_tables[table_name];
+            if (table) {
+                var kp = table.key_prefix;
+                var encoded = Binary_Encoding.encode_to_buffer(arr_index_selection, kp);
+                return this.count_keys_beginning(encoded);
+            } else {
+                throw new Error("Table " + table_name + " not found");
+            }
+
+        }
+
+
+
+
+        /*
+        if (this.model) {
+            
+        } else {
             //throw 'Expected this.model, otherwise can\'t find table by name'
             callback("Expected this.model, otherwise can't find table by name");
         }
+        */
     }
 
     /**
@@ -3664,6 +3807,120 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
     }
 
 
+
+
+    get_table_record_pk_by_index_lookup(table_name, index_field_name, index_field_value, callback) {
+
+
+        // inner function, could be async.
+
+        /*
+
+        (async () => {
+
+            
+
+
+
+            //throw 'stop';
+
+        })();
+
+        */
+
+        let table = this.model.map_tables[table_name];
+
+        let table_id = table.id;
+        let table_kp = table_id * 2 + 2;
+        let table_ikp = table_kp + 1;
+
+        //console.log('index_field_name', index_field_name);
+
+        let field_id = table.map_fields[index_field_name].id;
+        //console.log('***field_id', field_id);
+
+        let index_id = table.get_index_id_by_field_id(field_id);
+        //console.log('index_id', index_id);
+
+        // then do the lookup on the index with that id.
+
+        // could use the Buffer-Backed Index-Key to do this.
+        //  Like a normal key, but put together differently.
+
+        // Or the normal key would function as an index key.
+
+        let idx_beginning = new Key([table_ikp, index_id, index_field_value]);
+
+        //console.log('idx_beginning', idx_beginning);
+        //console.log('idx_beginning.buffer', idx_beginning.buffer);
+
+        // then do the lookup
+
+        // get a single record by the key prefix
+
+
+        let res = new Promise((resolve, reject) => {
+            this.get_records_by_key_prefix(idx_beginning.buffer, (err, records) => {
+                if (err) {
+                    //throw err;
+                    reject(err);
+                } else {
+                    //console.log('records', records);
+
+                    let rl = new Record_List(records);
+                    //console.log('rl', rl);
+
+                    //console.log('rl.decoded', rl.decoded);
+
+                    // but want to select the 1st / ith item from the record list.
+
+                    // get_nth
+                    let first_record = rl.get_nth(0);
+                    //console.log('first_record', first_record);
+
+                    //throw 'stop';
+
+
+
+
+                    // should just be 1 record.
+
+                    let l2 = first_record.length - idx_beginning.buffer.length;
+                    let b2 = Buffer.alloc(l2);
+
+                    first_record.copy(b2, 0, idx_beginning.buffer.length);
+                    //console.log('b2', b2);
+
+                    let decoded_2 = Binary_Encoding.decode_buffer(b2);
+                    //console.log('decoded_2', decoded_2);
+
+
+                    resolve(decoded_2);
+
+
+
+                }
+            })
+        })
+
+        return prom_opt_cb(res, callback);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    }
+
+
     // get the record itself by an index field lookup
 
     get_table_record_field_by_index_lookup(
@@ -3674,6 +3931,28 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
         callback
     ) {
         //var that = this;
+
+
+        // get the primary key for it.
+
+        (async () => {
+            // But need to look up on the model which index can get the id by which field.
+
+            // Put the index key together
+
+
+
+            let pk = await this.get_table_record_pk_by_index_lookup(table_name, index_field_name, index_field_value);
+
+            console.log('pk', pk);
+
+
+
+        })();
+
+
+
+        //throw 'NYI';
 
         // Possibly there should be further functionality for this on the server.
         //  A server maintaining its own core model would be useful.
@@ -3691,17 +3970,51 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
         // There could also be server-side index verification and fixing.
         //  Getting the Model running on the server means the server could properly index rows.
 
-        this.get_table_kp_by_name(table_name, (err, kp) => {
-            if (err) {
-                callback(err);
-            } else {
-                //var buf_kp = xas2(kp).buffer;
-                //that.subscribe_key_prefix_puts(buf_kp, subscription_event_handler);
 
-                var idx_kp = kp + 1;
-                //  then
-            }
-        });
+        // want to do this as a promise if we were not given the callback
+
+        /*
+
+        let inner = (callback) => {
+            let table = this.model.map_tables[table_name];
+
+            let table_id = table.id;
+            let table_kp = table_id * 2 + 2;
+
+            console.log('field_name', field_name);
+
+            console.log('Object.keys(table.map_fields)', Object.keys(table.map_fields));
+
+            let field_id = table.map_fields[field_name];
+
+
+            console.log('field_id', field_id);
+
+            // get the field id of what we are looking for,
+
+
+
+
+            (async () => {
+                // But need to look up on the model which index can get the id by which field.
+
+                // Put the index key together
+
+
+
+                //let index_key =
+
+
+
+            })();
+        }
+
+        return prom_or_cb(inner, callback);
+
+        */
+
+
+
     }
 
     iterate_backup_files(path, cb_iteration, cb_done) {

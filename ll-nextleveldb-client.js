@@ -2421,6 +2421,9 @@ class LL_NextLevelDB_Client extends Evented_Class {
     //  useful when getting records we know are within one table.
 
 
+    // A lower level version that automatically uses paging would help.
+    //  Does not automatically decode, but a decoding wrapper function should be easy enough.
+
     ll_get_records_by_key_prefix(key_prefix, paging, decode = false, remove_kps = false, callback) {
 
         // Should probably use a sig test in the client.
@@ -2439,6 +2442,11 @@ class LL_NextLevelDB_Client extends Evented_Class {
             sig = get_a_sig(a);
         let buf_key_prefix;
 
+
+        // With observables, default paging
+
+        //const obs_default_paging = new Paging.Count(1024);
+
         //console.log('ll_get_records_by_key_prefix sig', sig);
 
         if (sig === '[n,o]') {
@@ -2450,9 +2458,19 @@ class LL_NextLevelDB_Client extends Evented_Class {
             callback = a[1];
         } else if (sig === '[B,o]') {
             buf_key_prefix = key_prefix;
+        } else if (sig === '[B]') {
+            buf_key_prefix = key_prefix;
+            paging = new Paging.Count(1024);
         } else if (sig === '[B,f]') {
             buf_key_prefix = key_prefix;
             callback = a[1];
+            paging = new Paging.None();
+
+            // [n,b,f]
+        } else if (sig === '[B,b,f]') {
+            buf_key_prefix = key_prefix;
+            decode = a[1];
+            callback = a[2];
             paging = new Paging.None();
 
             // [n,b,f]
@@ -3229,6 +3247,8 @@ class LL_NextLevelDB_Client extends Evented_Class {
     ll_count_keys_in_range(buf_l, buf_u, limit = -1, callback) {
         var paging;
 
+        //console.log('ll_count_keys_in_range');
+
         // Don't include the limit option if it's -1?
         //  or 0.
         //  Think it could be the the 3rd param when in the more advanced paging and options mode.
@@ -3256,6 +3276,7 @@ class LL_NextLevelDB_Client extends Evented_Class {
         //console.log('buf_query', buf_query);
 
         if (callback) {
+
             this.send_binary_message(buf_query, (err, res_binary_message) => {
                 if (err) {
                     callback(err);
@@ -3268,6 +3289,7 @@ class LL_NextLevelDB_Client extends Evented_Class {
         } else {
             // Observe send binart message could have nicer message encoding.
             //  could use .send
+            console.log('pre obs send');
 
             return this.observe_send_binary_message(buf_query, true);
         }
