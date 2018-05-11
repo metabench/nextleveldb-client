@@ -854,15 +854,18 @@ class LL_NextLevelDB_Client extends Evented_Class {
 
             if (response_type_code === ERROR_MESSAGE) {
                 callback(buf_the_rest);
+
             } else if (response_type_code === BINARY_PAGING_NONE) {
+                // Still don't want decoding. Just it's signified that there is no paging.
+                //  Function call could have its own custom encoding but moving away from that into the future.
 
+                // Specifically this is the no decode handler, so no decoding here!
 
+                //console.log('buf_the_rest', buf_the_rest);
+                //let decoded = Binary_Encoding.decode_buffer(buf_the_rest)[0];
 
-                console.log('buf_the_rest', buf_the_rest);
-                let decoded = Binary_Encoding.decode_buffer(buf_the_rest)[0];
-
-                console.log('decoded', decoded);
-                callback(null, decoded);
+                //console.log('decoded', decoded);
+                callback(null, buf_the_rest);
 
 
                 //callback(buf_the_rest);
@@ -1037,6 +1040,8 @@ class LL_NextLevelDB_Client extends Evented_Class {
 
 
                     this.setup_binary_no_paging_no_decode_handler(idx, callback);
+
+
 
                     /*
                     ws_response_handlers[idx] = function (obj_message) {
@@ -3245,9 +3250,16 @@ class LL_NextLevelDB_Client extends Evented_Class {
      * @memberof LL_NextLevelDB_Client
      */
     ll_count_keys_in_range(buf_l, buf_u, limit = -1, callback) {
+        let a = arguments,
+            l = a.length;
+        if (l === 3) {
+            callback = a[2];
+            limit = -1;
+        }
+
         var paging;
 
-        //console.log('ll_count_keys_in_range');
+        //console.log('client ll_count_keys_in_range');
 
         // Don't include the limit option if it's -1?
         //  or 0.
@@ -3266,7 +3278,6 @@ class LL_NextLevelDB_Client extends Evented_Class {
             paging.limit = limit;
         }
 
-
         var buf_command = xas2(LL_COUNT_KEYS_IN_RANGE).buffer;
         // the lengths of the buffers too...
         var buf_query = Buffer.concat([buf_command, paging.buffer, xas2(buf_l.length).buffer, buf_l, xas2(buf_u.length).buffer, buf_u]);
@@ -3275,8 +3286,8 @@ class LL_NextLevelDB_Client extends Evented_Class {
 
         //console.log('buf_query', buf_query);
 
-        if (callback) {
 
+        if (callback) {
             this.send_binary_message(buf_query, (err, res_binary_message) => {
                 if (err) {
                     callback(err);
@@ -3289,8 +3300,7 @@ class LL_NextLevelDB_Client extends Evented_Class {
         } else {
             // Observe send binart message could have nicer message encoding.
             //  could use .send
-            console.log('pre obs send');
-
+            //console.log('pre obs send');
             return this.observe_send_binary_message(buf_query, true);
         }
     }

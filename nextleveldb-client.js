@@ -807,10 +807,6 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
     //   Could split it on the client into multiple puts.
 
 
-
-
-
-
     put_arr_records(arr_records, callback) {
         // encode the records into binary buffer
 
@@ -2516,7 +2512,7 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
                         if (err) {
                             callback(err);
                         } else {
-                            console.log('fields_records', fields_records);
+                            //console.log('fields_records', fields_records);
 
                             let res_keys = [];
                             let res_values = [];
@@ -3317,8 +3313,8 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
 
 
         let table_id = this.model.table_id(table_name);
-        console.log('table_id', table_id);
-        console.log('arr_key_selection', arr_key_selection);
+        //console.log('table_id', table_id);
+        //console.log('arr_key_selection', arr_key_selection);
 
         var buf = Model_Database.encode_key(
             table_id * 2 + 2,
@@ -3331,7 +3327,7 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
 
         if (callback) {
             // obs_to_cb(res);
-            console.log('using obs_to_cb');
+            //console.log('using obs_to_cb');
             obs_to_cb(res, callback);
 
         } else {
@@ -3356,7 +3352,7 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
 
         // can rely on there being a Model with correct core now.
 
-        console.log('count_table_selection_records table_name', table_name);
+        //console.log('count_table_selection_records table_name', table_name);
 
 
 
@@ -3904,17 +3900,6 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
         })
 
         return prom_opt_cb(res, callback);
-
-
-
-
-
-
-
-
-
-
-
 
 
 
