@@ -53,6 +53,8 @@ const Table_Subscription = require('./table-subscription');
 
 const SELECT_FROM_TABLE = 41;
 
+const fnl = require('fnl');
+const prom_or_cb = fnl.prom_or_cb;
 
 
 // inner async functions will definitely help.
@@ -104,15 +106,6 @@ const SUB_CONNECTED = 0;
 const SUB_RES_TYPE_BATCH_PUT = 1;
 
 
-/*
-let remove_kp = (arr_records) => {
-    for (let c = 0, l = arr_records.length; c < l; c++) {
-        arr_records[c][0] = arr_records[c][0].splice(1);
-    }
-    return arr_records;
-}
-*/
-
 // 22/03/2018
 //  Would be worth doing some syncing.
 
@@ -144,23 +137,6 @@ const cb_to_prom_or_cb = (inner_with_cb, opt_cb) => {
     }
 }
 
-const prom_or_cb = (prom, opt_cb) => {
-    if (opt_cb) {
-        prom.then((res) => {
-            opt_cb(null, res);
-        }, err => {
-            opt_cb(err);
-        })
-    } else {
-        if (prom instanceof Promise) {
-            return prom;
-        } else {
-            // assuming its a function.
-            return new Promise(prom);
-        }
-
-    }
-}
 
 var directory_exists = function (path, callback) {
     fs.stat(resolve(path), function (err, stat) {
@@ -253,19 +229,31 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
 
 
     start(callback) {
-        super.start((err, res) => {
-            if (err) {
-                callback(err);
-            } else {
-                this.load_core((err, model) => {
-                    if (err) {
-                        callback(err);
-                    } else {
-                        callback(null, model);
-                    }
-                })
-            }
-        })
+
+        // will change to async and promise.
+
+        return prom_or_cb((resolve, reject) => {
+
+            super.start((err, res) => {
+                if (err) {
+                    reject(err);
+                } else {
+                    this.load_core((err, model) => {
+                        if (err) {
+                            reject(err);
+                        } else {
+                            resolve(null, model);
+                        }
+                    })
+                }
+            })
+
+
+        }, callback)
+
+
+
+
     }
 
     /**
