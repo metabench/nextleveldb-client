@@ -42,11 +42,16 @@ const tof = lang.tof;
 //var encodings = require('../nextleveldb-server/encodings/encodings');
 const x = xas2 = require('xas2');
 
+const fnl = require('fnl');
+const prom_or_cb = fnl.prom_or_cb;
+const obs_or_cb = fnl.obs_or_cb;
+
 const Binary_Encoding = require('binary-encoding');
 const Binary_Encoding_Record = Binary_Encoding.Record;
 
 const Model = require("nextleveldb-model");
 const Model_Database = Model.Database;
+const Command_Message = Model.Command_Message;
 const Command_Response_Message = Model.Command_Response_Message;
 
 //console.log('encodings.poloniex.market', encodings.poloniex.market);
@@ -57,8 +62,6 @@ const protocol = 'http://';
 
 const path = require('path');
 const Key_List = Model.Key_List;
-
-
 
 // Will renumber these at some point.
 
@@ -87,6 +90,10 @@ const LL_GET_RECORDS_IN_RANGE_UP_TO = 10;
 const LL_FIND_COUNT_TABLE_RECORDS_INDEX_MATCH = 11;
 const INSERT_TABLE_RECORD = 12;
 const INSERT_RECORDS = 13;
+
+
+const ENSURE_RECORD = 14;
+
 const DELETE_RECORDS_BY_KEYS = 18;
 const ENSURE_TABLE = 20;
 const ENSURE_TABLES = 21;
@@ -150,10 +157,6 @@ const ARRAY = 10;
 
 const return_message_type = true;
 
-
-
-
-
 // Separate out the type of paging from the type of whatever is encoded.
 //  Returning function most likely knows what kind of data to expect, or can be made to be that way.
 //   Don't need to tell the server to return encoded records.
@@ -193,12 +196,6 @@ const KEY_PAGING_LAST = 9;
 //  
 const ERROR_MESSAGE = 10;
 
-
-
-
-
-
-
 // Is going to have much more advanced client<>server functionality, with much more advanced server-side functionality too.
 //  Will be able to upload a binary encoded array of table definitions for it to ensure, and it will do that.
 //   It is going to use a Model on the server side to translate these definitions within the commands for the appropriate rows / row updates in the database.
@@ -214,8 +211,6 @@ const ERROR_MESSAGE = 10;
 // Need some more server-side functionality to do with adding a binary encoded table struture (list) to the database.
 //  This could use Binary Paging as an option. Not dealing with records in particular? Or if it's Record Paging, could return the records that are added / changed / deleted.
 //   More flexibility in the binary paging systems to add encoding for deleted records.
-
-
 
 // 26/03/2018
 //  Backpressure seems like it could be an issue. The client's receive buffer gets full quicker than it raises the message events.
@@ -561,8 +556,6 @@ class LL_NextLevelDB_Client extends Evented_Class {
 
     // 
 
-
-
     receive_binary_message(buf_message) {
 
         // Probably will be best to use a Command_Message_Response object. No need for encoding and decoding code here.
@@ -704,9 +697,6 @@ class LL_NextLevelDB_Client extends Evented_Class {
         this.websocket_client.send(buf);
     }
 
-
-
-
     // send_paged_command is simpler because it uses classes to handle message encoding / decoding / paging.
     //  will use this for ll_get_records_in_ranges, which will enable (much) faster syncing.
 
@@ -715,32 +705,24 @@ class LL_NextLevelDB_Client extends Evented_Class {
     //  May want to get the full page data buffers back.
     //   Easier to split them up later, or at least more efficient if we are to put them in the DB soon.
     //   Could make a batch_put that handles already split records.
-
-
     // nicer alternative to the observe_send_binary_message
 
     send_paged_command(command_id, params) {
         // This should be the simplest API yet.
         //  Not sure we even should have to send paging details in terms of what type of paging, as it would not vary by command.
-
         // Binary paging, Record Paging, Timed paging?
         //  Probably eplace binary and record paging with just 'count' paging.
         //  See if the server can interpret one of them as the other.
         //   Change it so we only use 1 of them, then get rid of the other.
-
-
         let message_id = this.id_ws_req++;
-
         console.log('send_paged_command command_id', command_id);
         // encode the message with the params.
-
         let return_options = new Paging.Count_Paging(1024);
         let buf_msg = Buffer.concat([xas2(message_id).buffer, xas2(command_id).buffer, return_options.buffer, Binary_Encoding.encode_to_buffer(params)]);
 
         console.log('buf_msg', buf_msg);
         this.websocket_client.send(buf_msg);
         //return res;
-
         // And want a simple return message processor.
         //  The code paths in various places have become too long & boilerplatery. Need to make it call explicitly named, clear functions to get it to do what is required.
 
@@ -748,11 +730,8 @@ class LL_NextLevelDB_Client extends Evented_Class {
 
         // And probably worth returning an observable where all messages go.
         //  Returning a parsed message makes sense.
-
         // also want to use Command_Response_Message to build the messages on the server-side.
         //  When both client and server side messages are using the same code, it will then be possible / much easier to change the messaging protocol.
-
-
         // The message id has been removed.
         //  Not sure that's best.
 
@@ -765,7 +744,6 @@ class LL_NextLevelDB_Client extends Evented_Class {
             } else {
                 // Some earlier 'clever' programming strips out the message id from the beginning of the buffer.
                 // Now more use of Binary_Encoding with its greater functionality.
-
                 response_message = new Command_Response_Message(Buffer.concat([xas2(message_id).buffer, obj_message]));
             }
             console.log('response_message', response_message);
@@ -773,31 +751,22 @@ class LL_NextLevelDB_Client extends Evented_Class {
             //  response_message.value
             console.log('response_message.value.length', response_message.value.length);
             console.log('response_message.kv_buffers', response_message.kvp_buffers);
-
             res.raise('next', response_message.value_buffer);
             //console.log('response_message.is_last', response_message.is_last);
-
             if (response_message.is_last) {
                 res.raise('complete');
             }
         }
-
         return res;
-
     }
 
 
     setup_binary_no_paging_no_decode_handler(idx, callback) {
-
         // The message has had its idx removed already. Not sure that's best.
-
         let pos = 0,
             response_type_code;
 
         this.ws_response_handlers[idx] = (obj_message, idx) => {
-            //console.log('obj_message', obj_message);
-            //console.log('idx', idx);
-
             [response_type_code, pos] = xas2.read(obj_message, pos);
             //console.log('PAGING_NONE obj_message', obj_message);
             //console.log('response_type_code', response_type_code);
@@ -805,71 +774,39 @@ class LL_NextLevelDB_Client extends Evented_Class {
             // check to see if we get an error response.
             let buf_the_rest = Buffer.alloc(obj_message.length - pos);
             obj_message.copy(buf_the_rest, 0, pos);
-            //console.log('buf_the_rest', buf_the_rest);
 
             if (response_type_code === ERROR_MESSAGE) {
                 callback(buf_the_rest);
-
             } else if (response_type_code === BINARY_PAGING_NONE) {
-                // Still don't want decoding. Just it's signified that there is no paging.
-                //  Function call could have its own custom encoding but moving away from that into the future.
-
-                // Specifically this is the no decode handler, so no decoding here!
-
-                //console.log('buf_the_rest', buf_the_rest);
-                //let decoded = Binary_Encoding.decode_buffer(buf_the_rest)[0];
-
-                //console.log('decoded', decoded);
                 callback(null, buf_the_rest);
-
-
                 //callback(buf_the_rest);
             } else {
-
                 callback(null, buf_the_rest);
             }
-
             this.ws_response_handlers[idx] = null;
         };
     }
-
-
-
-
-    /*
-                    
-    */
-
-
     // Option of removing the kp from the results.
     //  another option alongside decode?
 
     send_binary_message(message, message_type = BINARY_PAGING_NONE, decode = false, remove_kp = false, callback) {
 
         console.log('send_binary_message');
-
-
         //const remove_kp = false;
-
 
         // Encoding the message into a buffer would be very useful.
         //  
 
-
         let a = arguments;
 
-
         // Should not need to supply the message type - could read it.
-
 
         // Moving decoding out of the handler would help.
         //  Want to make a streamlined version of this with no decoding here.
         //  Decoding results won't be too hard, also can use functions and wrap functions to return decoded data.
         //   Also, some functions will return decoded values, rather than keys or records which can be encoded and still useful.
 
-
         // Need to read what type of message it is when the message gets returned....
-
         //console.log('a.length', a.length);
 
         if (a.length === 2) {
@@ -899,11 +836,8 @@ class LL_NextLevelDB_Client extends Evented_Class {
             ws_response_handlers = this.ws_response_handlers;
 
         var buf_2 = Buffer.concat([xas2(idx).buffer, message]);
-
         // Could extract a paging info and message id value from the obj_message
-
         // Would be helpful in many cases to have a paging info byte in the response.
-
         //console.log('idx', idx);
 
         //  Inefficient in some ways when we know it's not needed.
@@ -1221,9 +1155,8 @@ class LL_NextLevelDB_Client extends Evented_Class {
         //  will send a stop command command.
 
 
-
-
-
+        // could just use a depaging observer in some cases.
+        //  may be a bit lower perf but simpler, more logical code.
 
 
         //let send_message_receipt = this.send_message_receipt;
@@ -1231,6 +1164,14 @@ class LL_NextLevelDB_Client extends Evented_Class {
         //let page_number = 0;
         // the message will contain the message idx, the message type, and then maybe further options.
         //
+
+        // No longer want decoding of records as an option here.
+        //  Should completely remove the decoding option from params.
+        //  There will be other ways to do it.
+        //  Then won't need to handle decoding on the return.
+        //   Do need to automatically unpage results???
+        //    Unpaged will be true by default.
+
 
         ws_response_handlers[idx] = (obj_message) => {
             pos = 0;
@@ -1514,12 +1455,8 @@ class LL_NextLevelDB_Client extends Evented_Class {
         //  Want it to get a response to the stop function.
 
         res.stop = () => {
-
-
             this.send_stop_command(idx);
         }
-
-
         return res;
 
     }
@@ -1540,6 +1477,7 @@ class LL_NextLevelDB_Client extends Evented_Class {
 
 
     // Make a version that sends the command, as a Command_Message
+
 
     cb_send_command(message_type_id, message_args, callback) {
         let message_id = this.id_ws_req++;
@@ -1568,8 +1506,9 @@ class LL_NextLevelDB_Client extends Evented_Class {
         this.setup_binary_no_paging_no_decode_handler(message_id, callback);
         this.websocket_client.send(buf);
     }
-
     // deprecate this too
+
+    // just send the command message....
 
     send(message_type_id, message_args, return_options, callback) {
         return_options = return_options || new Paging.Record_Paging(1024);
@@ -1584,14 +1523,26 @@ class LL_NextLevelDB_Client extends Evented_Class {
         }
     }
 
+    // Would be nice if this could use a more standard observable...
+    //  Meaning if it's just the one page coming back it gets handled in a standard way.
+
+    send_command(command_message, callback) {
+        // Need to set up the return handler.
+        //  Want to set up a return handler that is as general as possible.
+
+        // want a paged / unpaged return handler.
+        //  May need to consult the command_message
+
+        console.log('send_command command_message', command_message);
+        throw 'stop';
+
+        this.websocket_client.send(command_message.buffer);
+
+    }
 
     // change to send_command(command, opt_cb)
-
-
-
     // Paging could use a subscription.
     //  The subscription would be ended after the server finishes.
-
 
     // Multi callback messages / subscriptions
     //  Keeps the response handler until its closed / unsubscribed.
@@ -1662,14 +1613,9 @@ class LL_NextLevelDB_Client extends Evented_Class {
 
     // Need to create and test the paging and observable usages of these functions.
 
-
-
-
     // Paging, decoding option, callback or observable.
     // A limit option in the request would be useful.
     //  
-
-
 
     // Also, option to remove the kp from the result.
     //  useful when getting records we know are within one table.
@@ -1686,10 +1632,12 @@ class LL_NextLevelDB_Client extends Evented_Class {
     //  decode option wouldn't be sent to the server, but command options could be passed through to the handler.
     //   or used to choose which handler is to be used.
 
-
-
     // Remove options, change to send_command
     //  
+
+    // Paging could be by default in the Command_Message, within ll_get_records_in_range
+
+    // 
 
     ll_get_records_by_key_prefix(key_prefix, paging, decode = false, remove_kps = false, callback) {
 
@@ -1775,9 +1723,6 @@ class LL_NextLevelDB_Client extends Evented_Class {
             //callback = a[2];
             //throw 'stop';
         } else {
-
-
-
 
             console.trace();
             throw 'Unexpected sig to ll_get_records_by_key_prefix, sig: ' + sig;
@@ -2135,7 +2080,7 @@ class LL_NextLevelDB_Client extends Evented_Class {
     //  make paging default and in the background.
     //  unpaging happens by default too
 
-
+    // Leave until a bit later
 
     ll_get_records_in_range(buf_l, buf_u, paging, decode = false, remove_kps = false, callback) {
         let a = arguments,
@@ -2363,6 +2308,9 @@ class LL_NextLevelDB_Client extends Evented_Class {
 
         //console.log('buf_query', buf_query);
 
+        // obs_or_cb_send
+        //  that will be the default 'send'
+
 
         if (callback) {
             this.send_binary_message(buf_query, (err, res_binary_message) => {
@@ -2491,9 +2439,6 @@ class LL_NextLevelDB_Client extends Evented_Class {
             });
 
         }
-
-
-
     }
 
 
@@ -2563,21 +2508,6 @@ class LL_NextLevelDB_Client extends Evented_Class {
         buf_query = Buffer.concat([xas2(LL_GET_ALL_KEYS).buffer, paging.buffer]);
         let obs_msg = this.observe_send_binary_message(buf_query, decode);
         return obs_msg;
-
-
-
-
-
-        /*
-        this.send_binary_message(buf_query, (err, res_binary_message) => {
-            if (err) {
-                callback(err);
-            } else {
-                callback(null, res_binary_message);
-            }
-        });
-        */
-        //this._json_get_request('query/all_keys', callback);
     }
 
 
@@ -2615,9 +2545,7 @@ class LL_NextLevelDB_Client extends Evented_Class {
             paging = new Paging.Timed(delay);
             callback = null;
         }
-
         //throw 'stop';
-
         // Can be given a paging param rather than 
 
 
@@ -2638,7 +2566,6 @@ class LL_NextLevelDB_Client extends Evented_Class {
                     if (return_message_type) {
 
                     }
-
                     [count, pos] = x.read(res_binary_message, pos);
                     callback(null, count);
                 }
@@ -2653,10 +2580,52 @@ class LL_NextLevelDB_Client extends Evented_Class {
             buf_query = Buffer.concat([xas2(LL_COUNT_RECORDS).buffer, paging.buffer]);
             let obs_msg = this.observe_send_binary_message(buf_query, decode);
             return obs_msg;
-
         }
+    }
 
 
+    // Need most of the functionality on the server
+    //  Just send the record over, server handles the details.
+    //  This function is low level in terms of the protocol and not much being done on the client,
+    //   just send the request and receive the result.
+
+    // Will have more efficient way to ensure multiple records at once.
+    //  Dealing with sets of records and observables that produce them will help.
+
+
+
+
+
+
+    ensure_record(b_record, callback) {
+        let cm = new Command_Message(ENSURE_RECORD, b_record);
+
+
+        return this.send_command(cm, callback);
+        // Think about send_command being able to deal with pages of results.
+        //  And could have setup_result_handlers function.
+        //   observable_send... could use that instead, move the code.
+
+
+
+
+        /*
+
+        return prom_or_cb((resolve, reject) => {
+            // construct the Command_Message
+
+            let cm = new Command_Message(ENSURE_RECORD, b_record);
+            
+            // Or could do try/catcg with the command?
+
+
+
+            resolve(this.send_command(cm));
+
+
+        }, callback);
+
+        */
     }
 
 
@@ -2739,7 +2708,6 @@ class LL_NextLevelDB_Client extends Evented_Class {
                 callback(null, decoded);
             }
         });
-
     }
 
     'ensure_tables'(arr_tables, decode = true, callback) {

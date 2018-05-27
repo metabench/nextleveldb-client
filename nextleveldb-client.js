@@ -60,6 +60,19 @@ const prom_or_cb = fnl.prom_or_cb;
 // inner async functions will definitely help.
 //  combined with returning observable / promise, or a callback.
 
+// Some of this could be moved to the core
+
+// Some of it would use the core, and work over the client or the server.
+
+
+// nextleveldb-poly
+// nextleveldb-tools-that-will-work-on-both-client-and-server-api
+// nextleveldb-iso
+// nextleveldb-api-extensions
+
+
+
+
 
 
 
@@ -247,13 +260,7 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
                     })
                 }
             })
-
-
         }, callback)
-
-
-
-
     }
 
     /**
@@ -297,7 +304,6 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
             }
         });
     }
-
 
     // Now have function on the server to do this, but no interface
     get_table_max_key(table_name, callback) {
@@ -1727,6 +1733,8 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
         });
     }
 
+
+    // could just be table selection
     get_table_field_names_by_table_id(table_id, callback) {
         // Should know the table fields id already.
         const that = this;
@@ -2556,13 +2564,13 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
 
         // And does not decode the records.
 
-        let res = this.get_records_by_key_prefix(buf);
+        return this.get_records_by_key_prefix(buf, callback);
 
-        if (callback) {
-            obs_to_cb(res, callback);
-        } else {
-            return res;
-        }
+        //if (callback) {
+        //    obs_to_cb(res, callback);
+        //} else {
+        //    return res;
+        //}
     }
 
     // Selecting from the index...
@@ -2576,15 +2584,11 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
      * @memberof NextlevelDB_Client
      */
     count_table_selection_records(table_name, arr_index_selection, callback) {
-
         // accept callback
         //  observable would be better, getting counts as it progresses.
 
         // can rely on there being a Model with correct core now.
-
         //console.log('count_table_selection_records table_name', table_name);
-
-
 
         if (callback) {
             var table = this.model.map_tables[table_name];
@@ -2649,11 +2653,6 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
 
     // matching records against values for retrieval seems important
     //  seems a lot like a 'where' clause in SQL.
-
-
-
-
-
 
     select_from_table(table, arr_fields, paging, decode = true, callback) {
 
@@ -2911,7 +2910,6 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
             if (type === 'put') {
                 res.raise('put', table_event.record);
             }
-
             //throw 'stop';
         });
         return res;
@@ -3019,9 +3017,7 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
     validate_last_backup(callback) {
         // Needs to ensure the model is loaded first.
         //  Load it from the server if its not already.
-
         var that = this;
-
         that.ensure_model((err, model) => {
             if (err) {
                 callback(err);
@@ -3039,20 +3035,14 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
                             (file, file_name) => {
                                 decoded = Binary_Encoding.decode_buffer(file)[0];
                                 //console.log('decoded.length', decoded.length);
-
                                 // Decode rows from within Binary_Encoding.
-
                                 still_buf_encoded_rows = Binary_Encoding.get_row_buffers(
                                     decoded
                                 );
                                 //console.log('still_buf_encoded_rows.length', still_buf_encoded_rows.length);
-
                                 rows = Model_Database.decode_model_rows(still_buf_encoded_rows);
-
                                 //console.log('rows', rows);
-
                                 // possibly could do this in a web worker.
-
                                 each(rows, row => {
                                     kp = row[0][0];
                                     table = map_kps[kp];
@@ -3063,7 +3053,6 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
                                     }
                                 });
                                 // Then decode with xas2
-
                                 //var decoded_2 = Binary_Encoding.decode_buffer(decoded, 0);
                                 //console.log('decoded_2.length', decoded_2.length);
                             },
@@ -3078,8 +3067,6 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
         });
     }
 
-
-
     // scan table records
     error_scan_table(table_name) {
         let obs_records = this.get_table_records(table_name, false);
@@ -3088,7 +3075,6 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
         let error_records = [];
         obs_records.on('next', record => {
             try {
-
                 let decoded = Model_Database.decode_model_row(record);
             } catch (err) {
                 error_records.push(record);
@@ -3097,37 +3083,27 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
 
         obs_records.on('complete', () => {
             //console.log('error_records', error_records);
-
             // And can try to decode the values of each of them.
-
             each(error_records, error_record => {
                 let d_value = Binary_Encoding.decode_buffer(error_record[1]);
                 //console.log('d_value', d_value);
                 //console.log('decoded', decoded);
-
                 res.raise('next', error_record);
             });
-
             res.raise('complete');
-
         });
-
         return res;
         //return obs_records;
     }
-
 }
 
 var last_backup_path = callback => {
     var user_dir = os.homedir();
     //console.log('user_dir', user_dir);
     //var docs_dir =
-
     var path_backups = user_dir + "/NextLevelDB/backups";
     path_backups = path_backups.split("\\").join("/");
-
     //exists(path_backups, )
-
     directory_exists(path_backups, (err, exists) => {
         if (!exists) {
             callback(
@@ -3245,8 +3221,6 @@ if (require.main === module) {
     console.log('access_token', access_token);
     var server_data8 = config.nextleveldb_connections.data8;
     server_data8.access_token = access_token;
-
-
 
     var lc = new NextlevelDB_Client(server_data8);
 
