@@ -93,6 +93,7 @@ const INSERT_RECORDS = 13;
 
 
 const ENSURE_RECORD = 14;
+const ENSURE_TABLE_RECORD = 15;
 
 const DELETE_RECORDS_BY_KEYS = 18;
 const ENSURE_TABLE = 20;
@@ -1533,10 +1534,22 @@ class LL_NextLevelDB_Client extends Evented_Class {
         // want a paged / unpaged return handler.
         //  May need to consult the command_message
 
-        console.log('send_command command_message', command_message);
-        throw 'stop';
+        // need the message id.
+        //  May as well set it within command_message
+
+        console.log('---pre set id');
+        command_message.id = this.id_ws_req++;
+        console.log('---post set id');
+
+
+        console.log('send_command command_message.buffer', command_message.buffer);
+        //throw 'stop';
 
         this.websocket_client.send(command_message.buffer);
+
+        // Should set up the return handler.
+
+
 
     }
 
@@ -2598,7 +2611,15 @@ class LL_NextLevelDB_Client extends Evented_Class {
 
 
     ensure_record(b_record, callback) {
-        let cm = new Command_Message(ENSURE_RECORD, b_record);
+
+
+
+        // Just one message in an array.
+        //  Want to be able to decode that record internally.
+
+
+
+        let cm = new Command_Message(ENSURE_RECORD, [b_record]);
 
 
         return this.send_command(cm, callback);
@@ -2627,6 +2648,16 @@ class LL_NextLevelDB_Client extends Evented_Class {
 
         */
     }
+
+    ensure_table_record(table_id, b_record, callback) {
+        console.log('table_id', table_id);
+        let cm = new Command_Message(ENSURE_TABLE_RECORD, [table_id, b_record]);
+        console.log('cm', cm);
+        return this.send_command(cm, callback);
+    }
+
+
+
 
 
     // another put function. would load the data into the OO class thing.

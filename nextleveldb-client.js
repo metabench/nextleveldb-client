@@ -1392,13 +1392,25 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
                     if (err) {
                         callback(err);
                     } else {
-                        var decoded_index_key = Model_Database.decode_key(ll_res[0]);
-                        var arr_pk_ref = decoded_index_key.slice(3);
-                        if (arr_pk_ref.length === 1) {
-                            callback(null, arr_pk_ref[0]);
+                        //console.log('ll_res', ll_res);
+                        // could have no results.
+
+                        // undefined would be OK to return.
+
+                        if (ll_res.length === 0) {
+                            callback(null, undefined);
                         } else {
-                            callback(null, arr_pk_ref);
+                            var decoded_index_key = Model_Database.decode_key(ll_res[0]);
+                            var arr_pk_ref = decoded_index_key.slice(3);
+                            if (arr_pk_ref.length === 1) {
+                                callback(null, arr_pk_ref[0]);
+                            } else {
+                                callback(null, arr_pk_ref);
+                            }
                         }
+
+
+
                     }
                 });
                 //Model.Database.enc
