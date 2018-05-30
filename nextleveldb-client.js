@@ -1396,7 +1396,7 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
                         console.log('err', err);
                         callback(err);
                     } else {
-                        console.log('ll_res', ll_res);
+                        //console.log('ll_res', ll_res);
                         // could have no results.
 
                         // undefined would be OK to return.
