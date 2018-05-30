@@ -70,14 +70,6 @@ const prom_or_cb = fnl.prom_or_cb;
 // nextleveldb-iso
 // nextleveldb-api-extensions
 
-
-
-
-
-
-
-
-
 // Mixins would be better to separate the code.
 //  Validation, higher level CRUD etc.
 //  Higher level CRUD could be done using mixins, and even different mixins could be swapped.
@@ -1349,6 +1341,10 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
 
     // get_table_kv_field_names
 
+
+    // This should be made into a core function that runs on the server
+    //  It would be made available to the client.
+
     /**
      *
      *
@@ -1370,6 +1366,10 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
 
         //let inner = 
         return cb_to_prom_or_cb((callback) => {
+
+            //console.log('table_index_lookup');
+            //console.log('value', value);
+
             var t_value = tof(value);
 
             if (!this.model) {
@@ -1380,6 +1380,7 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
             var table_kp = this.model.map_tables[table_name].key_prefix;
 
             if (t_value === "array") {
+                console.trace();
                 throw "yet to implement";
             } else {
 
@@ -1388,11 +1389,14 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
                     index_id, [value]
                 );
 
+                //console.log('buf_idx_key', buf_idx_key);
+
                 this.ll_get_keys_beginning(buf_idx_key, (err, ll_res) => {
                     if (err) {
+                        console.log('err', err);
                         callback(err);
                     } else {
-                        //console.log('ll_res', ll_res);
+                        console.log('ll_res', ll_res);
                         // could have no results.
 
                         // undefined would be OK to return.
@@ -1401,6 +1405,7 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
                             callback(null, undefined);
                         } else {
                             var decoded_index_key = Model_Database.decode_key(ll_res[0]);
+                            //console.log('decoded_index_key', decoded_index_key);
                             var arr_pk_ref = decoded_index_key.slice(3);
                             if (arr_pk_ref.length === 1) {
                                 callback(null, arr_pk_ref[0]);

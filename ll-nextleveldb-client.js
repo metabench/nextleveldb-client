@@ -1799,7 +1799,7 @@ class LL_NextLevelDB_Client extends Evented_Class {
         var buf_l = Buffer.concat([buf_beginning, buf_0]);
         var buf_u = Buffer.concat([buf_beginning, buf_1]);
 
-        this.ll_get_keys_in_range(buf_l, buf_u, callback);
+        return this.ll_get_keys_in_range(buf_l, buf_u, callback);
     }
 
     // Paging options, decoding option
