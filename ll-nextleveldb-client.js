@@ -43,6 +43,8 @@ const tof = lang.tof;
 const x = xas2 = require('xas2');
 
 const fnl = require('fnl');
+
+const cb_to_prom_or_cb = fnl.cb_to_prom_or_cb;
 const prom_or_cb = fnl.prom_or_cb;
 const obs_or_cb = fnl.obs_or_cb;
 
@@ -568,6 +570,15 @@ class LL_NextLevelDB_Client extends Evented_Class {
         //   Could consolidate code paths to help with that.
         //   There will be code to make it easier for the handlers, so less decoding / processing needed here.
 
+        // Could load it into a Command_Response_Message immediately.
+        //  Then give the handler the Command_Response_Message
+
+        // crm_handler
+
+
+
+
+
 
 
         //console.log('receive_binary_message buf_message', buf_message);
@@ -576,6 +587,10 @@ class LL_NextLevelDB_Client extends Evented_Class {
         [message_id, pos] = xas2.read(buf_message, pos);
 
         //console.log('1) message_id', message_id);
+
+        // A hander that receives the full message...
+
+
 
         var buf_the_rest = Buffer.alloc(buf_message.length - pos);
         buf_message.copy(buf_the_rest, 0, pos);
@@ -594,20 +609,23 @@ class LL_NextLevelDB_Client extends Evented_Class {
 
         if (return_message_type) {
             //console.log('buf_the_rest', buf_the_rest);
+
+
+
+
             if (message_type === BINARY_PAGING_NONE) {
 
                 // Could even strip the paging / structure flag here.
-
-                this.ws_response_handlers[message_id](buf_the_rest, message_id);
+                this.ws_response_handlers[message_id](buf_the_rest, message_id, buf_message);
                 // could remove the response handler here
                 this.ws_response_handlers[message_id] = null;
             }
             if (message_type === BINARY_PAGING_FLOW) {
-                this.ws_response_handlers[message_id](buf_the_rest, message_id);
+                this.ws_response_handlers[message_id](buf_the_rest, message_id, buf_message);
                 // could remove the response handler here
             }
             if (message_type === BINARY_PAGING_LAST) {
-                this.ws_response_handlers[message_id](buf_the_rest, message_id);
+                this.ws_response_handlers[message_id](buf_the_rest, message_id, buf_message);
                 // could remove the response handler here
                 this.ws_response_handlers[message_id] = null;
             }
@@ -615,7 +633,7 @@ class LL_NextLevelDB_Client extends Evented_Class {
             if (message_type === RECORD_PAGING_NONE) {
                 // Could even strip the paging / structure flag here.
                 //console.log('2) message_id', message_id);
-                this.ws_response_handlers[message_id](buf_the_rest, message_id);
+                this.ws_response_handlers[message_id](buf_the_rest, message_id, buf_message);
                 // could remove the response handler here
                 this.ws_response_handlers[message_id] = null;
             }
@@ -623,18 +641,18 @@ class LL_NextLevelDB_Client extends Evented_Class {
                 //let buf_null = Binary_Encoding.flexi_encode_item(undefined);
 
                 //console.log('buf_the_rest', buf_the_rest);
-                this.ws_response_handlers[message_id](buf_the_rest, message_id);
+                this.ws_response_handlers[message_id](buf_the_rest, message_id, buf_message);
                 // could remove the response handler here
                 this.ws_response_handlers[message_id] = null;
             }
 
             if (message_type === RECORD_PAGING_FLOW) {
                 //console.log('RECORD_PAGING_FLOW');
-                this.ws_response_handlers[message_id](buf_the_rest, message_id);
+                this.ws_response_handlers[message_id](buf_the_rest, message_id, buf_message);
                 // could remove the response handler here
             }
             if (message_type === RECORD_PAGING_LAST) {
-                this.ws_response_handlers[message_id](buf_the_rest, message_id);
+                this.ws_response_handlers[message_id](buf_the_rest, message_id, buf_message);
                 // could remove the response handler here
                 this.ws_response_handlers[message_id] = null;
             }
@@ -642,28 +660,28 @@ class LL_NextLevelDB_Client extends Evented_Class {
             if (message_type === KEY_PAGING_NONE) {
                 // Could even strip the paging / structure flag here.
                 //console.log('2) message_id', message_id);
-                this.ws_response_handlers[message_id](buf_the_rest, message_id);
+                this.ws_response_handlers[message_id](buf_the_rest, message_id, buf_message);
                 // could remove the response handler here
                 this.ws_response_handlers[message_id] = null;
             }
             if (message_type === KEY_PAGING_FLOW) {
-                this.ws_response_handlers[message_id](buf_the_rest, message_id);
+                this.ws_response_handlers[message_id](buf_the_rest, message_id, buf_message);
                 // could remove the response handler here
             }
             if (message_type === KEY_PAGING_LAST) {
-                this.ws_response_handlers[message_id](buf_the_rest, message_id);
+                this.ws_response_handlers[message_id](buf_the_rest, message_id, buf_message);
                 // could remove the response handler here
                 this.ws_response_handlers[message_id] = null;
             }
 
             if (message_type === ERROR_MESSAGE) {
                 //console.log('client has received an error from the server');
-                this.ws_response_handlers[message_id](buf_the_rest, message_id);
+                this.ws_response_handlers[message_id](buf_the_rest, message_id, buf_message);
                 this.ws_response_handlers[message_id] = null;
             }
 
         } else {
-            this.ws_response_handlers[message_id](buf_the_rest, message_id);
+            this.ws_response_handlers[message_id](buf_the_rest, message_id, buf_message);
             this.ws_response_handlers[message_id] = null;
         }
 
@@ -791,13 +809,11 @@ class LL_NextLevelDB_Client extends Evented_Class {
     //  another option alongside decode?
 
     send_binary_message(message, message_type = BINARY_PAGING_NONE, decode = false, remove_kp = false, callback) {
-
-        console.log('send_binary_message');
+        //console.log('send_binary_message');
         //const remove_kp = false;
 
         // Encoding the message into a buffer would be very useful.
         //  
-
         let a = arguments;
 
         // Should not need to supply the message type - could read it.
@@ -891,9 +907,6 @@ class LL_NextLevelDB_Client extends Evented_Class {
                             // Change the encoding on the server, to say that any result is encoded as an xas2, and indicated that it's coded as xas2.
                             //  That's because we decode the message of BINARY type, which here means we use Binary_Encoding
 
-
-
-
                             //console.log('buf_the_rest', buf_the_rest);
                             // 
 
@@ -955,7 +968,6 @@ class LL_NextLevelDB_Client extends Evented_Class {
                         } else {
                             decoded = Model_Database.decode_model_rows(row_buffers);
                         }
-
                         callback(null, decoded);
                         ws_response_handlers[idx] = null;
                     };
@@ -971,8 +983,6 @@ class LL_NextLevelDB_Client extends Evented_Class {
                 // could remove the response handler here
             }
             // The response handler itself could be an observable object.
-
-
             // Need to be able to handle this without decoding
 
             if (message_type === RECORD_PAGING_FLOW) {
@@ -993,10 +1003,8 @@ class LL_NextLevelDB_Client extends Evented_Class {
             }
             if (message_type === RECORD_PAGING_LAST) {
                 ws_response_handlers[idx] = function (obj_message, page_number) {
-
                     // Could look in the response to see what message we have, if it indicates paging.
                     //  However, it's a binary message
-
                     callback(null, obj_message, page_number, true);
                     ws_response_handlers[idx] = null;
                 };
@@ -1022,7 +1030,6 @@ class LL_NextLevelDB_Client extends Evented_Class {
                         //let decoded = Binary_Encoding.decode(buf_the_rest);
 
                         var row_buffers = Binary_Encoding.get_row_buffers(buf_the_rest);
-
                         let decoded = Model_Database.decode_model_rows(row_buffers);
                         //console.log('decoded', decoded);
 
@@ -1090,7 +1097,6 @@ class LL_NextLevelDB_Client extends Evented_Class {
             };
         }
         //this.websocket_connection.sendBytes(buf_2);
-
         this.websocket_client.send(buf_2);
     }
 
@@ -1528,6 +1534,44 @@ class LL_NextLevelDB_Client extends Evented_Class {
     //  Meaning if it's just the one page coming back it gets handled in a standard way.
 
     send_command(command_message, callback) {
+        // no paging or receiving observable here?
+        //  what about combined promise and observable that is thenable?
+
+        return prom_or_cb((resolve, reject) => {
+            //console.log('---pre set id');
+            command_message.id = this.id_ws_req++;
+            //console.log('---post set id');
+            //console.log('send_command command_message.buffer', command_message.buffer);
+            //throw 'stop';
+            this.websocket_client.send(command_message.buffer);
+
+            //console.log('command_message.id', command_message.id);
+            // Should set up the return handler.
+            // have the simplest handler, and use Command_Response_Message to decode
+
+            // Ahhhh... it's missing the message id from the buffer.
+            //  Not so clever.
+            this.ws_response_handlers[command_message.id] = (buf_partial_message, message_id, buf_message) => {
+
+                //console.log('send_command response buf_message', buf_message);
+
+                let crm = new Command_Response_Message(buf_message);
+                // then look at the data inside it?
+
+                //console.log('crm.value', crm.value);
+
+                // respond with the OO Command_Response_Message
+
+                // .record
+                // .value
+
+                resolve(crm.value);
+
+
+
+
+            }
+        }, callback);
         // Need to set up the return handler.
         //  Want to set up a return handler that is as general as possible.
 
@@ -1537,17 +1581,11 @@ class LL_NextLevelDB_Client extends Evented_Class {
         // need the message id.
         //  May as well set it within command_message
 
-        console.log('---pre set id');
-        command_message.id = this.id_ws_req++;
-        console.log('---post set id');
+        // no callback / handler?
 
 
-        console.log('send_command command_message.buffer', command_message.buffer);
-        //throw 'stop';
 
-        this.websocket_client.send(command_message.buffer);
 
-        // Should set up the return handler.
 
 
 
@@ -2383,22 +2421,37 @@ class LL_NextLevelDB_Client extends Evented_Class {
     }
 
     ll_get_record(buf_key, callback) {
-        //console.log('ll_get_record');
-        let buf_query = Buffer.concat([xas2(LL_GET_RECORD).buffer, buf_key]);
-        //console.log('buf_query', buf_query);
-        this.send_binary_message(buf_query, (err, res_binary_message) => {
-            if (err) {
-                callback(err);
-            } else {
-                if (res_binary_message.length === 0) {
-                    //console.log('ll_get_record res_binary_message', res_binary_message);
-                    callback(null, undefined);
+
+        //return prom_or_cb
+
+        return cb_to_prom_or_cb((callback) => {
+            //console.log('ll_get_record');
+            //console.log('buf_key', buf_key);
+            let buf_query = Buffer.concat([xas2(LL_GET_RECORD).buffer, buf_key]);
+            //console.log('buf_query', buf_query);
+            //console.log('');
+            this.send_binary_message(buf_query, (err, res_binary_message) => {
+                if (err) {
+                    callback(err);
                 } else {
-                    //console.log('ll_get_record res_binary_message', res_binary_message);
-                    callback(null, res_binary_message);
+                    //console.log('1) res_binary_message', res_binary_message);
+                    //console.log('buf_key', buf_key);
+                    //console.trace();
+
+
+                    if (res_binary_message.length === 0) {
+                        //console.log('ll_get_record res_binary_message', res_binary_message);
+                        //console.log('pre cb undefined');
+                        callback(null, undefined);
+                    } else {
+                        //console.log('ll_get_record res_binary_message', res_binary_message);
+                        callback(null, res_binary_message);
+                    }
                 }
-            }
-        });
+            });
+        }, callback)
+
+
     }
 
     // Getting table fields data to the client, 
@@ -2654,6 +2707,9 @@ class LL_NextLevelDB_Client extends Evented_Class {
         let cm = new Command_Message(ENSURE_TABLE_RECORD, [table_id, b_record]);
         console.log('cm', cm);
         return this.send_command(cm, callback);
+
+
+
     }
 
 

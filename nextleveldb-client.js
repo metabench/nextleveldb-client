@@ -335,17 +335,21 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
      * @memberof NextlevelDB_Client
      */
     load_core(callback) {
-        this.get_core((err, buf_core) => {
-            if (err) {
-                callback(err);
-            } else {
-                //console.log('buf_core', buf_core);
 
-                //throw 'stop';
-                this.model = Model_Database.load_buf(buf_core);
-                callback(null, this.model);
-            }
-        });
+        return prom_or_cb((resolve, reject) => {
+            this.get_core((err, buf_core) => {
+                if (err) {
+                    reject(err);
+                } else {
+                    //console.log('buf_core', buf_core);
+                    //throw 'stop';
+                    this.model = Model_Database.load_buf(buf_core);
+                    resolve(this.model);
+                }
+            });
+        }, callback);
+
+
     }
 
     load_buf_core(callback) {
@@ -1345,30 +1349,8 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
     // This should be made into a core function that runs on the server
     //  It would be made available to the client.
 
-    /**
-     *
-     *
-     * @param {any} table_name
-     * @param {any} index_id
-     * @param {any} value
-     * @param {any} callback
-     * @memberof NextlevelDB_Client
-     */
-    table_index_lookup(table_name, index_id, value, callback) {
-        // only looking up one value in the index for the moment?
-
-        //  could also look at an array of values.
-
-        // only will get one record.
-
-        // will return promise if no callback is used.
-
-
-        //let inner = 
-        return cb_to_prom_or_cb((callback) => {
-
-            //console.log('table_index_lookup');
-            //console.log('value', value);
+    table_pk_lookup(table_name, index_id, value, callback) {
+        return prom_or_cb((resolve, reject) => {
 
             var t_value = tof(value);
 
@@ -1393,35 +1375,108 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
 
                 this.ll_get_keys_beginning(buf_idx_key, (err, ll_res) => {
                     if (err) {
-                        console.log('err', err);
-                        callback(err);
+                        //console.log('err', err);
+                        reject(err);
                     } else {
-                        //console.log('ll_res', ll_res);
+                        //console.log('table_pk_lookup ll_res', ll_res);
                         // could have no results.
 
                         // undefined would be OK to return.
 
                         if (ll_res.length === 0) {
-                            callback(null, undefined);
+                            resolve(undefined);
                         } else {
                             var decoded_index_key = Model_Database.decode_key(ll_res[0]);
                             //console.log('decoded_index_key', decoded_index_key);
                             var arr_pk_ref = decoded_index_key.slice(3);
-                            if (arr_pk_ref.length === 1) {
-                                callback(null, arr_pk_ref[0]);
-                            } else {
-                                callback(null, arr_pk_ref);
-                            }
+                            resolve(arr_pk_ref);
                         }
-
-
-
                     }
                 });
                 //Model.Database.enc
             }
+
+        }, callback);
+
+    }
+
+    table_record_lookup(table_name, index_id, value, callback) {
+        //console.log('1) table_record_lookup');
+        return prom_or_cb((resolve, reject) => {
+            (async () => {
+                //console.log('2) table_record_lookup');
+
+
+
+                let arr_pk_ref = await this.table_pk_lookup(table_name, index_id, value);
+                //console.log('arr_pk_ref', arr_pk_ref);
+
+                // if it can't be found...
+                if (arr_pk_ref) {
+                    //console.log('1) arr_pk_ref', arr_pk_ref);
+                    arr_pk_ref.unshift(this.model.table_id(table_name) * 2 + 2);
+                    //console.log('2) arr_pk_ref', arr_pk_ref);
+                    // then compose a key.
+                    //let table_id = this.model.table_id(table_name);
+                    let k = new Model.BB_Key(arr_pk_ref);
+                    //console.log('k', k);
+
+                    // then get, using that key.
+
+                    let record = await this.get_record(k);
+                    //console.log('record', record);
+
+                    resolve(record);
+                } else {
+                    resolve(undefined);
+                }
+
+
+
+
+            })();
         }, callback);
     }
+
+
+    /**
+     *
+     *
+     * @param {any} table_name
+     * @param {any} index_id
+     * @param {any} value
+     * @param {any} callback
+     * @memberof NextlevelDB_Client
+     */
+    // record id
+    table_index_lookup(table_name, index_id, value, callback) {
+        // only looking up one value in the index for the moment?
+
+        //  could also look at an array of values.
+
+        // only will get one record.
+
+        // will return promise if no callback is used.
+
+
+        //let inner = 
+        return cb_to_prom_or_cb((callback) => {
+
+            //console.log('table_index_lookup');
+            //console.log('value', value);
+
+            (async () => {
+                let arr_pk_ref = await this.table_pk_lookup(table_name, index_id, value);
+                if (arr_pk_ref.length === 1) {
+                    resolve(arr_pk_ref[0]);
+                } else {
+                    resolve(arr_pk_ref);
+                }
+            })();
+        }, callback);
+    }
+
+
 
     /**
      *
@@ -2685,7 +2740,7 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
             sig = get_a_sig(a);
 
         let table_id;
-        console.log('select_from_table sig', sig);
+        //console.log('select_from_table sig', sig);
         if (sig === '[s,a]') {
             table_id = this.model.table_id(table);
             paging = new Paging.Record(1024);
@@ -2710,6 +2765,40 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
 
     // And what about getting an OO record class?
     //  These records here are kv arrays.
+
+    get_record(key, callback) {
+
+        /*
+        return prom_or_cb((resolve, reject) => {
+
+        }, callback);
+        */
+
+        //console.log('key.buffer', key.buffer);
+
+        return prom_or_cb(async (resolve, reject) => {
+            //(async () => {
+
+            let got_record = await this.ll_get_record(key.buffer || key);
+
+            if (got_record) {
+                let bbr = new Model.BB_Record(got_record);
+                resolve(bbr);
+            } else {
+                resolve(undefined);
+            }
+
+
+
+            //})();
+
+        }, callback);
+
+        //return this.ll_get_record(key.buffer || key, callback);
+
+
+
+    }
 
     // Could make more flexibility on return types.
 
@@ -2772,9 +2861,7 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
         let buf3;
         if (model_record.table.pk_incrementor) {
             //console.log('[Model_Database.encode_model_rows(bufs), model_record.table.pk_incrementor.get_record_bin()]', [Model_Database.encode_model_rows(bufs), Model_Database.encode_model_rows(model_record.table.pk_incrementor.get_record_bin())]);
-
             //let bufs2 = Array.concat()
-
             // This part does not seem quite right.
 
             //console.log('bufs', bufs);
@@ -2784,8 +2871,6 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
             bufs.push(inc_record_bin);
             //throw 'stop';
             buf3 = Model_Database.encode_model_rows(bufs);
-
-
 
             //buf3 = Buffer.concat([Model_Database.encode_model_rows(bufs), Model_Database.encode_model_rows(model_record.table.pk_incrementor.get_record_bin())]);
         } else {
@@ -2853,11 +2938,9 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
                 var res = {};
                 if (i_sub_evt_type === SUB_CONNECTED) {
                     console.log("Connected");
-
                     // When it is connected, we return the subscription id.
                     //console.log('i_num', i_num);
                     // May need the subscription number to unsubscribe.
-
                     res.type = "connected";
                     res.client_subscription_id = i_num;
                     res.id = i_num;
@@ -2866,15 +2949,11 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
 
                 if (i_sub_evt_type === SUB_RES_TYPE_BATCH_PUT) {
                     //console.log("SUB_RES_TYPE_BATCH_PUT", SUB_RES_TYPE_BATCH_PUT);
-
                     //console.log('buf_the_rest', buf_the_rest);
-
                     res.type = "batch_put";
-
                     // need to decode the buffer.
                     var row_buffers = Binary_Encoding.get_row_buffers(buf_the_rest);
                     //console.log('row_buffers', row_buffers);
-
                     each(row_buffers, (rb, i) => {
                         var d = Model_Database.decode_model_row(rb, remove_kp);
                     });
@@ -2909,17 +2988,12 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
         // Then within the table subscription, we can subscribe to a filter or possibly fast key lookup.
         //  Would respond with events for actions that happen to that table.
         // 
-
         // Subscribe here with the subscribe_table_puts function above, then have the events go through a Table_Subscription object.
-
         let res = new Table_Subscription();
-
         // Getting closer to the raw data back. It's decoded, but still has the table key prefix.
         //  Maybe this will be ll subscribe table puts.
-
         this.subscribe_table_puts(table_name, (table_event) => {
             //console.log('table_event', table_event);
-
             let type = table_event.type;
             if (type === 'batch_put') {
                 res.raise('batch_put', table_event.records);
@@ -2941,23 +3015,15 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
         let table_id = table.id;
         let table_kp = table_id * 2 + 2;
         let table_ikp = table_kp + 1;
-
         //console.log('index_field_name', index_field_name);
-
         let field_id = table.map_fields[index_field_name].id;
         //console.log('***field_id', field_id);
-
         let index_id = table.get_index_id_by_field_id(field_id);
         let idx_beginning = new Key([table_ikp, index_id, index_field_value]);
-
         //console.log('idx_beginning', idx_beginning);
         //console.log('idx_beginning.buffer', idx_beginning.buffer);
-
         // then do the lookup
-
         // get a single record by the key prefix
-
-
         let res = new Promise((resolve, reject) => {
             this.get_records_by_key_prefix(idx_beginning.buffer, (err, records) => {
                 if (err) {
@@ -2968,10 +3034,8 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
                     let first_record = rl.get_nth(0);
                     let l2 = first_record.length - idx_beginning.buffer.length;
                     let b2 = Buffer.alloc(l2);
-
                     first_record.copy(b2, 0, idx_beginning.buffer.length);
                     //console.log('b2', b2);
-
                     let decoded_2 = Binary_Encoding.decode_buffer(b2);
                     //console.log('decoded_2', decoded_2);
                     resolve(decoded_2);
@@ -2980,7 +3044,6 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
         })
         return prom_or_cb(res, callback);
     }
-
 
     // get the record itself by an index field lookup
 
@@ -2993,22 +3056,14 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
         callback
     ) {
         //var that = this;
-
-
         // get the primary key for it.
 
         (async () => {
             // But need to look up on the model which index can get the id by which field.
-
             // Put the index key together
 
-
-
             let pk = await this.get_table_record_pk_by_index_lookup(table_name, index_field_name, index_field_value);
-
             console.log('pk', pk);
-
-
 
         })();
 
