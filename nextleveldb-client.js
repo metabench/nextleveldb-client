@@ -55,6 +55,7 @@ const SELECT_FROM_TABLE = 41;
 
 const fnl = require('fnl');
 const prom_or_cb = fnl.prom_or_cb;
+const obs_or_cb = fnl.obs_or_cb;
 
 
 // inner async functions will definitely help.
@@ -791,9 +792,15 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
             l = a.length,
             sig = get_a_sig(a);
 
-        //console.log('count_records_by_key_prefix sig', sig);
+        // strip last ,u?
 
-        if (sig === '[n,n]') {
+
+        //console.log('count_records_by_key_prefix');
+        //console.log('limit', limit);
+        //console.log('!!callback', !!callback);
+
+        //console.log('count_records_by_key_prefix sig', sig);
+        if (sig === '[n,n]' || sig === '[n,n,u]') {
 
         } else if (sig === '[n,f]') {
             callback = a[1];
@@ -803,16 +810,9 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
         }
 
         // Limit would be useful here.
+        // model function to create the key range.
 
-        var buf_kp = xas2(i_kp).buffer;
-        var buf_0 = Buffer.alloc(1);
-        buf_0.writeUInt8(0, 0);
-        var buf_1 = Buffer.alloc(1);
-        buf_1.writeUInt8(255, 0);
-        // and another 0 byte...?
-
-        var buf_l = Buffer.concat([buf_kp, buf_0]);
-        var buf_u = Buffer.concat([buf_kp, buf_1]);
+        let [buf_l, buf_u] = Model_Database.kp_to_range(xas2(i_kp).buffer);
 
 
         if (callback) {
@@ -824,10 +824,13 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
                 }
             });
         } else {
+            console.log('ll count')
             return this.ll_count_keys_in_range(buf_l, buf_u);
         }
     }
 
+
+    // ll_count_keys_in_range has limit param now.
     // count_records_by_key_prefix_up_to
     count_records_by_key_prefix_up_to(i_kp, limit, callback) {
         console.log('count_records_by_key_prefix_up_to i_kp', i_kp);
@@ -2486,8 +2489,6 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
     //  Time limit / record count limit.
 
     count_table_records(table_name, limit = -1, callback) {
-
-
         let a = arguments,
             l = a.length;
         if (l === 2) {
@@ -2495,33 +2496,15 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
             limit = -1;
         }
 
-        // use a get table id promise
+        let kp = this.model.table_id(table_name) * 2 + 2;
+        //console.log('kp', kp);
+        //console.log('limit', limit);
+        return this.count_records_by_key_prefix(kp, limit, callback);
 
-        //let prom_table_id = get_table_id_by_name(table_name);
-        //prom_table_id.then(table_id)
-
-        let obs_res = new Evented_Class();
-
-        this.get_table_id_by_name(table_name).then(table_id => {
-            let kp = table_id * 2 + 2;
-
-            //this.count_records_by_key_prefix(kp, callback);
-
-
-            // But the counts should not be as an array
-
-            // A version with a limit would be nice.
-            let obs_count_records = this.count_records_by_key_prefix(kp, limit);
-            let t_obs_count_records = tof(obs_count_records);
-            obs_throughput(obs_res, obs_count_records);
-
-
-        });
-
-
-        return obs_res;
     }
 
+
+    // remove this.
     count_table_records_up_to(table_name, limit, callback) {
         if (this.model) {
             var table = this.model.map_tables[table_name];

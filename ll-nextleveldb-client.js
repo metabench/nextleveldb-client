@@ -47,6 +47,7 @@ const fnl = require('fnl');
 const cb_to_prom_or_cb = fnl.cb_to_prom_or_cb;
 const prom_or_cb = fnl.prom_or_cb;
 const obs_or_cb = fnl.obs_or_cb;
+const observable = fnl.observable;
 
 const Binary_Encoding = require('binary-encoding');
 const Binary_Encoding_Record = Binary_Encoding.Record;
@@ -1153,9 +1154,307 @@ class LL_NextLevelDB_Client extends Evented_Class {
             message_type, response_type_code, page_number = 0;
 
         var buf_2 = Buffer.concat([xas2(idx).buffer, message]);
-        let res = new Evented_Class();
 
-        res.unpaged = false;
+
+        // create an actual observable.
+
+
+
+
+        let res = observable((next, complete, error) => {
+
+
+            ws_response_handlers[idx] = (obj_message) => {
+                pos = 0;
+                [message_type, pos] = xas2.read(obj_message, pos);
+                if (decode) {
+                    //console.log('str_result_grouping', str_result_grouping);
+
+                    //console.log('res.unpaged', res.unpaged);
+                    //throw 'stop';
+
+                    if (message_type === BINARY_PAGING_NONE) {
+
+                        console.log('BINARY_PAGING_NONE', BINARY_PAGING_NONE);
+
+                        var buf_the_rest = Buffer.alloc(obj_message.length - pos);
+                        obj_message.copy(buf_the_rest, 0, pos);
+                        //console.log('buf_the_rest', buf_the_rest);
+
+                        // Maybe do full decode buffer, and enclose the results as an array in all cases.
+                        //  Could change the server-side code to use the paging helper that would always do this.
+
+                        let decoded = Binary_Encoding.decode_buffer(buf_the_rest)[0];
+                        //console.log('** decoded', decoded);
+
+                        // Events just handling true and false....
+                        res.raise('next', decoded);
+                        res.raise('complete', decoded);
+                    }
+                    if (message_type === BINARY_PAGING_FLOW) {
+                        console.log('BINARY_PAGING_FLOW');
+
+                        [page_number, pos] = xas2.read(obj_message, pos);
+                        var buf_the_rest = Buffer.alloc(obj_message.length - pos);
+                        obj_message.copy(buf_the_rest, 0, pos);
+
+                        let decoded = Binary_Encoding.decode_buffer(buf_the_rest)[0];
+
+                        if (res.unpaged || str_result_grouping === 'single') {
+                            each(decoded, item => res.raise('next', item));
+                        } else {
+                            res.raise('next', decoded);
+                        }
+                        //console.log('decoded', decoded);
+
+
+                        this.send_message_receipt(idx, page_number);
+                    }
+                    if (message_type === BINARY_PAGING_LAST) {
+                        console.log('BINARY_PAGING_LAST');
+
+
+                        [page_number, pos] = xas2.read(obj_message, pos);
+                        var buf_the_rest = Buffer.alloc(obj_message.length - pos);
+                        obj_message.copy(buf_the_rest, 0, pos);
+                        let decoded_buffer = Binary_Encoding.decode_buffer(buf_the_rest)[0];
+                        //console.log('decoded_buffer', decoded_buffer);
+                        //console.log('str_result_grouping', str_result_grouping);
+                        if (res.unpaged || str_result_grouping === 'single') {
+                            each(decoded_buffer, item => res.raise('next', item));
+                        } else {
+                            res.raise('next', decoded_buffer);
+                        }
+                        res.raise('complete', decoded_buffer);
+                        this.send_message_receipt(idx, page_number);
+                    }
+
+                    // KEY_PAGING_NONE
+                    //  Returning pages or buffers of keys could be a useful base level feature.
+
+                    if (message_type === RECORD_PAGING_NONE) {
+                        var buf_the_rest = Buffer.alloc(obj_message.length - pos);
+                        obj_message.copy(buf_the_rest, 0, pos);
+                        let arr_bufs_kv = Binary_Encoding.split_length_item_encoded_buffer_to_kv(buf_the_rest);
+                        //console.log('arr_bufs_kv', arr_bufs_kv);
+
+                        //let remove_kp = true;
+                        let arr_decoded = Model_Database.decode_model_rows(arr_bufs_kv[0], remove_kp);
+                        res.raise('next', arr_decoded);
+                        res.raise('complete');
+                    }
+                    if (message_type === RECORD_PAGING_FLOW) {
+                        var buf_the_rest = Buffer.alloc(obj_message.length - pos);
+                        obj_message.copy(buf_the_rest, 0, pos);
+                        [page_number, pos] = xas2.read(buf_the_rest, 0);
+                        //console.log('page_number', page_number);
+
+                        let buf2 = Buffer.alloc(buf_the_rest.length - pos);
+                        buf_the_rest.copy(buf2, 0, pos);
+                        //console.log('buf2', buf2);
+                        // read and copy buffer.
+                        let arr_bufs_kv = Binary_Encoding.split_length_item_encoded_buffer_to_kv(buf2);
+                        //let remove_kp = true;
+                        //console.log('arr_bufs_kv[0]', arr_bufs_kv[0]);
+                        //console.log('arr_bufs_kv', arr_bufs_kv);
+                        //throw 'stop';
+                        let arr_decoded = Model_Database.decode_model_rows(arr_bufs_kv, remove_kp);
+
+                        if (res.unpaged || str_result_grouping === 'single') {
+                            each(arr_decoded, item => res.raise('next', item));
+                        } else {
+                            res.raise('next', arr_decoded);
+                        }
+
+                        this.send_message_receipt(idx, page_number);
+                    }
+                    if (message_type === RECORD_PAGING_LAST) {
+                        var buf_the_rest = Buffer.alloc(obj_message.length - pos);
+                        obj_message.copy(buf_the_rest, 0, pos);
+                        [page_number, pos] = xas2.read(buf_the_rest, 0);
+                        //console.log('page_number', page_number);
+                        let buf2 = Buffer.alloc(buf_the_rest.length - pos);
+                        buf_the_rest.copy(buf2, 0, pos);
+                        let arr_bufs_kv = Binary_Encoding.split_length_item_encoded_buffer_to_kv(buf2);
+                        //let remove_kp = true;
+                        //console.log('arr_bufs_kv', arr_bufs_kv);
+                        let arr_decoded = Model_Database.decode_model_rows(arr_bufs_kv, remove_kp);
+                        //console.log('arr_decoded', arr_decoded);
+
+                        // Say what page it is?
+
+                        if (res.unpaged || str_result_grouping === 'single') {
+                            each(arr_decoded, item => res.raise('next', item));
+                        } else {
+                            res.raise('next', arr_decoded);
+                        }
+
+                        //res.raise('next', arr_decoded);
+                        res.raise('complete', arr_decoded);
+                        this.send_message_receipt(idx, page_number);
+                    }
+
+                    // KEY PAGING observe_send_binary_message
+
+                    if (message_type === KEY_PAGING_NONE) {
+                        var buf_the_rest = Buffer.alloc(obj_message.length - pos);
+                        obj_message.copy(buf_the_rest, 0, pos);
+                        //console.log('buf_the_rest', buf_the_rest);
+                        let arr_bufs_k = Binary_Encoding.split_length_item_encoded_buffer(buf_the_rest);
+                        let arr_decoded = Model_Database.decode_keys(arr_bufs_k, remove_kp);
+
+                        //console.log('arr_decoded', arr_decoded);
+
+                        //console.trace();
+                        //throw 'stop';
+
+                        res.raise('next', arr_decoded);
+                        res.raise('complete', arr_decoded);
+                    }
+                    if (message_type === KEY_PAGING_FLOW) {
+                        console.log('KEY_PAGING_FLOW');
+
+                        var buf_the_rest = Buffer.alloc(obj_message.length - pos);
+                        //console.log('buf_the_rest', buf_the_rest);
+                        obj_message.copy(buf_the_rest, 0, pos);
+                        pos = 0;
+                        [page_number, pos] = xas2.read(buf_the_rest, pos);
+                        //console.log('page_number', page_number);
+
+                        let buf2 = Buffer.alloc(buf_the_rest.length - pos);
+                        buf_the_rest.copy(buf2, 0, pos);
+                        let arr_bufs_keys = Binary_Encoding.split_length_item_encoded_buffer(buf2);
+                        let arr_decoded = Model_Database.decode_keys(arr_bufs_keys, remove_kp);
+
+                        res.raise('next', arr_decoded);
+                        //console.log('idx, page_number', idx, page_number);
+                        this.send_message_receipt(idx, page_number);
+                    }
+                    if (message_type === KEY_PAGING_LAST) {
+
+                        // 
+
+
+                        var buf_the_rest = Buffer.alloc(obj_message.length - pos);
+                        obj_message.copy(buf_the_rest, 0, pos);
+                        [page_number, pos] = xas2.read(buf_the_rest, 0);
+                        //console.log('page_number', page_number);
+                        let buf2 = Buffer.alloc(buf_the_rest.length - pos);
+                        buf_the_rest.copy(buf2, 0, pos);
+                        let arr_bufs_k = Binary_Encoding.split_length_item_encoded_buffer(buf2);
+                        let arr_decoded = Model_Database.decode_keys(arr_bufs_k, remove_kp);
+
+                        res.raise('next', arr_decoded);
+                        res.raise('complete', arr_decoded);
+                        this.send_message_receipt(idx, page_number);
+                    }
+
+                } else {
+                    if (message_type === BINARY_PAGING_NONE) {
+                        var buf_the_rest = Buffer.alloc(obj_message.length - pos);
+                        obj_message.copy(buf_the_rest, 0, pos);
+                        res.raise('next', buf_the_rest);
+                        res.raise('complete', buf_the_rest);
+                    }
+                    if (message_type === BINARY_PAGING_FLOW) {
+                        [page_number, pos] = xas2.read(obj_message, pos);
+                        var buf_the_rest = Buffer.alloc(obj_message.length - pos);
+                        obj_message.copy(buf_the_rest, 0, pos);
+                        res.raise('next', buf_the_rest);
+                        this.send_message_receipt(idx, page_number++);
+                    }
+                    if (message_type === BINARY_PAGING_LAST) {
+                        [page_number, pos] = xas2.read(obj_message, pos);
+
+                        var buf_the_rest = Buffer.alloc(obj_message.length - pos);
+                        obj_message.copy(buf_the_rest, 0, pos);
+
+                        //console.log('buf_the_rest', buf_the_rest);
+
+                        res.raise('next', buf_the_rest);
+                        res.raise('complete');
+                        this.send_message_receipt(idx, page_number++);
+                    }
+
+                    if (message_type === RECORD_PAGING_NONE) {
+                        var buf_the_rest = Buffer.alloc(obj_message.length - pos);
+                        obj_message.copy(buf_the_rest, 0, pos);
+                        res.raise('next', buf_the_rest);
+                        res.raise('complete');
+                    }
+                    if (message_type === RECORD_PAGING_FLOW) {
+                        [page_number, pos] = xas2.read(obj_message, pos);
+                        var buf_the_rest = Buffer.alloc(obj_message.length - pos);
+                        obj_message.copy(buf_the_rest, 0, pos);
+
+
+                        if (res.unpaged || str_result_grouping === 'single') {
+
+                            // Split.
+
+                            let arr_bufs_kv = Binary_Encoding.split_length_item_encoded_buffer_to_kv(buf_the_rest);
+                            each(arr_bufs_kv, item => res.raise('next', item));
+                            //let s = Binary_Encoding.spli
+
+                            //each(arr_decoded, item => res.raise('next', item));
+                        } else {
+                            res.raise('next', buf_the_rest);
+                        }
+
+
+
+                        this.send_message_receipt(idx, page_number++);
+                    }
+                    if (message_type === RECORD_PAGING_LAST) {
+                        [page_number, pos] = xas2.read(obj_message, pos);
+                        //console.log('page_number', page_number);
+                        var buf_the_rest = Buffer.alloc(obj_message.length - pos);
+                        obj_message.copy(buf_the_rest, 0, pos);
+                        // Series of buffer pairs.
+                        //res.raise('next', buf_the_rest);
+
+                        if (res.unpaged || str_result_grouping === 'single') {
+
+                            // Split.
+
+                            let arr_bufs_kv = Binary_Encoding.split_length_item_encoded_buffer_to_kv(buf_the_rest);
+                            each(arr_bufs_kv, item => res.raise('next', item));
+                            //let s = Binary_Encoding.spli
+
+                            //each(arr_decoded, item => res.raise('next', item));
+                        } else {
+                            res.raise('next', buf_the_rest);
+                        }
+
+                        res.raise('complete', buf_the_rest);
+                        this.send_message_receipt(idx, page_number++);
+                    }
+                }
+                // Could look in the response to see what message we have, if it indicates paging.
+                //  However, it's a binary message
+
+                //callback(null, obj_message);
+                //ws_response_handlers[idx] = null;
+            };
+            // [stop, pause, resume]
+
+            return [() => {
+                this.send_stop_command(idx);
+            }];
+        })
+
+        this.websocket_client.send(buf_2);
+
+        return res;
+
+
+        //let res = new Evented_Class();
+        // or make it thenable?
+
+
+
+
+        //res.unpaged = false;
 
         // be able to stop the observable.
         //  means telling it to stop on the server too.
@@ -1180,291 +1479,16 @@ class LL_NextLevelDB_Client extends Evented_Class {
         //    Unpaged will be true by default.
 
 
-        ws_response_handlers[idx] = (obj_message) => {
-            pos = 0;
-            [message_type, pos] = xas2.read(obj_message, pos);
-            if (decode) {
-                //console.log('str_result_grouping', str_result_grouping);
-
-                //console.log('res.unpaged', res.unpaged);
-                //throw 'stop';
-
-                if (message_type === BINARY_PAGING_NONE) {
-
-                    console.log('BINARY_PAGING_NONE', BINARY_PAGING_NONE);
-
-                    var buf_the_rest = Buffer.alloc(obj_message.length - pos);
-                    obj_message.copy(buf_the_rest, 0, pos);
-                    //console.log('buf_the_rest', buf_the_rest);
-
-                    // Maybe do full decode buffer, and enclose the results as an array in all cases.
-                    //  Could change the server-side code to use the paging helper that would always do this.
-
-                    let decoded = Binary_Encoding.decode_buffer(buf_the_rest)[0];
-                    //console.log('** decoded', decoded);
-
-                    // Events just handling true and false....
-                    res.raise('next', decoded);
-                    res.raise('complete', decoded);
-                }
-                if (message_type === BINARY_PAGING_FLOW) {
-                    console.log('BINARY_PAGING_FLOW');
-
-                    [page_number, pos] = xas2.read(obj_message, pos);
-                    var buf_the_rest = Buffer.alloc(obj_message.length - pos);
-                    obj_message.copy(buf_the_rest, 0, pos);
-
-                    let decoded = Binary_Encoding.decode_buffer(buf_the_rest)[0];
-
-                    if (res.unpaged || str_result_grouping === 'single') {
-                        each(decoded, item => res.raise('next', item));
-                    } else {
-                        res.raise('next', decoded);
-                    }
-                    //console.log('decoded', decoded);
-
-
-                    this.send_message_receipt(idx, page_number);
-                }
-                if (message_type === BINARY_PAGING_LAST) {
-                    console.log('BINARY_PAGING_LAST');
-
-
-                    [page_number, pos] = xas2.read(obj_message, pos);
-                    var buf_the_rest = Buffer.alloc(obj_message.length - pos);
-                    obj_message.copy(buf_the_rest, 0, pos);
-                    let decoded_buffer = Binary_Encoding.decode_buffer(buf_the_rest)[0];
-                    //console.log('decoded_buffer', decoded_buffer);
-                    //console.log('str_result_grouping', str_result_grouping);
-                    if (res.unpaged || str_result_grouping === 'single') {
-                        each(decoded_buffer, item => res.raise('next', item));
-                    } else {
-                        res.raise('next', decoded_buffer);
-                    }
-                    res.raise('complete', decoded_buffer);
-                    this.send_message_receipt(idx, page_number);
-                }
-
-                // KEY_PAGING_NONE
-                //  Returning pages or buffers of keys could be a useful base level feature.
-
-                if (message_type === RECORD_PAGING_NONE) {
-                    var buf_the_rest = Buffer.alloc(obj_message.length - pos);
-                    obj_message.copy(buf_the_rest, 0, pos);
-                    let arr_bufs_kv = Binary_Encoding.split_length_item_encoded_buffer_to_kv(buf_the_rest);
-                    //console.log('arr_bufs_kv', arr_bufs_kv);
-
-                    //let remove_kp = true;
-                    let arr_decoded = Model_Database.decode_model_rows(arr_bufs_kv[0], remove_kp);
-                    res.raise('next', arr_decoded);
-                    res.raise('complete');
-                }
-                if (message_type === RECORD_PAGING_FLOW) {
-                    var buf_the_rest = Buffer.alloc(obj_message.length - pos);
-                    obj_message.copy(buf_the_rest, 0, pos);
-                    [page_number, pos] = xas2.read(buf_the_rest, 0);
-                    //console.log('page_number', page_number);
-
-                    let buf2 = Buffer.alloc(buf_the_rest.length - pos);
-                    buf_the_rest.copy(buf2, 0, pos);
-                    //console.log('buf2', buf2);
-                    // read and copy buffer.
-                    let arr_bufs_kv = Binary_Encoding.split_length_item_encoded_buffer_to_kv(buf2);
-                    //let remove_kp = true;
-                    //console.log('arr_bufs_kv[0]', arr_bufs_kv[0]);
-                    //console.log('arr_bufs_kv', arr_bufs_kv);
-                    //throw 'stop';
-                    let arr_decoded = Model_Database.decode_model_rows(arr_bufs_kv, remove_kp);
-
-                    if (res.unpaged || str_result_grouping === 'single') {
-                        each(arr_decoded, item => res.raise('next', item));
-                    } else {
-                        res.raise('next', arr_decoded);
-                    }
-
-                    this.send_message_receipt(idx, page_number);
-                }
-                if (message_type === RECORD_PAGING_LAST) {
-                    var buf_the_rest = Buffer.alloc(obj_message.length - pos);
-                    obj_message.copy(buf_the_rest, 0, pos);
-                    [page_number, pos] = xas2.read(buf_the_rest, 0);
-                    //console.log('page_number', page_number);
-                    let buf2 = Buffer.alloc(buf_the_rest.length - pos);
-                    buf_the_rest.copy(buf2, 0, pos);
-                    let arr_bufs_kv = Binary_Encoding.split_length_item_encoded_buffer_to_kv(buf2);
-                    //let remove_kp = true;
-                    //console.log('arr_bufs_kv', arr_bufs_kv);
-                    let arr_decoded = Model_Database.decode_model_rows(arr_bufs_kv, remove_kp);
-                    //console.log('arr_decoded', arr_decoded);
-
-                    // Say what page it is?
-
-                    if (res.unpaged || str_result_grouping === 'single') {
-                        each(arr_decoded, item => res.raise('next', item));
-                    } else {
-                        res.raise('next', arr_decoded);
-                    }
-
-                    //res.raise('next', arr_decoded);
-                    res.raise('complete', arr_decoded);
-                    this.send_message_receipt(idx, page_number);
-                }
-
-                // KEY PAGING observe_send_binary_message
-
-                if (message_type === KEY_PAGING_NONE) {
-                    var buf_the_rest = Buffer.alloc(obj_message.length - pos);
-                    obj_message.copy(buf_the_rest, 0, pos);
-                    //console.log('buf_the_rest', buf_the_rest);
-                    let arr_bufs_k = Binary_Encoding.split_length_item_encoded_buffer(buf_the_rest);
-                    let arr_decoded = Model_Database.decode_keys(arr_bufs_k, remove_kp);
-
-                    //console.log('arr_decoded', arr_decoded);
-
-                    //console.trace();
-                    //throw 'stop';
-
-                    res.raise('next', arr_decoded);
-                    res.raise('complete', arr_decoded);
-                }
-                if (message_type === KEY_PAGING_FLOW) {
-                    console.log('KEY_PAGING_FLOW');
-
-                    var buf_the_rest = Buffer.alloc(obj_message.length - pos);
-                    //console.log('buf_the_rest', buf_the_rest);
-                    obj_message.copy(buf_the_rest, 0, pos);
-                    pos = 0;
-                    [page_number, pos] = xas2.read(buf_the_rest, pos);
-                    //console.log('page_number', page_number);
-
-                    let buf2 = Buffer.alloc(buf_the_rest.length - pos);
-                    buf_the_rest.copy(buf2, 0, pos);
-                    let arr_bufs_keys = Binary_Encoding.split_length_item_encoded_buffer(buf2);
-                    let arr_decoded = Model_Database.decode_keys(arr_bufs_keys, remove_kp);
-
-                    res.raise('next', arr_decoded);
-                    //console.log('idx, page_number', idx, page_number);
-                    this.send_message_receipt(idx, page_number);
-                }
-                if (message_type === KEY_PAGING_LAST) {
-
-                    // 
-
-
-                    var buf_the_rest = Buffer.alloc(obj_message.length - pos);
-                    obj_message.copy(buf_the_rest, 0, pos);
-                    [page_number, pos] = xas2.read(buf_the_rest, 0);
-                    //console.log('page_number', page_number);
-                    let buf2 = Buffer.alloc(buf_the_rest.length - pos);
-                    buf_the_rest.copy(buf2, 0, pos);
-                    let arr_bufs_k = Binary_Encoding.split_length_item_encoded_buffer(buf2);
-                    let arr_decoded = Model_Database.decode_keys(arr_bufs_k, remove_kp);
-
-                    res.raise('next', arr_decoded);
-                    res.raise('complete', arr_decoded);
-                    this.send_message_receipt(idx, page_number);
-                }
-
-            } else {
-                if (message_type === BINARY_PAGING_NONE) {
-                    var buf_the_rest = Buffer.alloc(obj_message.length - pos);
-                    obj_message.copy(buf_the_rest, 0, pos);
-                    res.raise('next', buf_the_rest);
-                    res.raise('complete', buf_the_rest);
-                }
-                if (message_type === BINARY_PAGING_FLOW) {
-                    [page_number, pos] = xas2.read(obj_message, pos);
-                    var buf_the_rest = Buffer.alloc(obj_message.length - pos);
-                    obj_message.copy(buf_the_rest, 0, pos);
-                    res.raise('next', buf_the_rest);
-                    this.send_message_receipt(idx, page_number++);
-                }
-                if (message_type === BINARY_PAGING_LAST) {
-                    [page_number, pos] = xas2.read(obj_message, pos);
-
-                    var buf_the_rest = Buffer.alloc(obj_message.length - pos);
-                    obj_message.copy(buf_the_rest, 0, pos);
-
-                    //console.log('buf_the_rest', buf_the_rest);
-
-                    res.raise('next', buf_the_rest);
-                    res.raise('complete');
-                    this.send_message_receipt(idx, page_number++);
-                }
-
-                if (message_type === RECORD_PAGING_NONE) {
-                    var buf_the_rest = Buffer.alloc(obj_message.length - pos);
-                    obj_message.copy(buf_the_rest, 0, pos);
-                    res.raise('next', buf_the_rest);
-                    res.raise('complete');
-                }
-                if (message_type === RECORD_PAGING_FLOW) {
-                    [page_number, pos] = xas2.read(obj_message, pos);
-                    var buf_the_rest = Buffer.alloc(obj_message.length - pos);
-                    obj_message.copy(buf_the_rest, 0, pos);
-
-
-                    if (res.unpaged || str_result_grouping === 'single') {
-
-                        // Split.
-
-                        let arr_bufs_kv = Binary_Encoding.split_length_item_encoded_buffer_to_kv(buf_the_rest);
-                        each(arr_bufs_kv, item => res.raise('next', item));
-                        //let s = Binary_Encoding.spli
-
-                        //each(arr_decoded, item => res.raise('next', item));
-                    } else {
-                        res.raise('next', buf_the_rest);
-                    }
-
-
-
-                    this.send_message_receipt(idx, page_number++);
-                }
-                if (message_type === RECORD_PAGING_LAST) {
-                    [page_number, pos] = xas2.read(obj_message, pos);
-                    //console.log('page_number', page_number);
-                    var buf_the_rest = Buffer.alloc(obj_message.length - pos);
-                    obj_message.copy(buf_the_rest, 0, pos);
-                    // Series of buffer pairs.
-                    //res.raise('next', buf_the_rest);
-
-                    if (res.unpaged || str_result_grouping === 'single') {
-
-                        // Split.
-
-                        let arr_bufs_kv = Binary_Encoding.split_length_item_encoded_buffer_to_kv(buf_the_rest);
-                        each(arr_bufs_kv, item => res.raise('next', item));
-                        //let s = Binary_Encoding.spli
-
-                        //each(arr_decoded, item => res.raise('next', item));
-                    } else {
-                        res.raise('next', buf_the_rest);
-                    }
-
-                    res.raise('complete', buf_the_rest);
-                    this.send_message_receipt(idx, page_number++);
-                }
-            }
-            // Could look in the response to see what message we have, if it indicates paging.
-            //  However, it's a binary message
-
-            //callback(null, obj_message);
-            //ws_response_handlers[idx] = null;
-        };
-
         //this.websocket_connection.sendBytes(buf_2);
-        this.websocket_client.send(buf_2);
+
 
         //console.log('1) res.unpaged', res.unpaged);
 
         // Incorporating a stop function.
         //  Want it to get a response to the stop function.
 
-        res.stop = () => {
-            this.send_stop_command(idx);
-        }
-        return res;
+        //res.stop = 
+        //return res;
 
     }
 
@@ -2703,9 +2727,9 @@ class LL_NextLevelDB_Client extends Evented_Class {
     }
 
     ensure_table_record(table_id, b_record, callback) {
-        console.log('table_id', table_id);
+        //console.log('table_id', table_id);
         let cm = new Command_Message(ENSURE_TABLE_RECORD, [table_id, b_record]);
-        console.log('cm', cm);
+        //console.log('cm', cm);
         return this.send_command(cm, callback);
 
 
