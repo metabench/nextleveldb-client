@@ -1100,8 +1100,6 @@ class LL_NextLevelDB_Client extends Evented_Class {
         //this.websocket_connection.sendBytes(buf_2);
         this.websocket_client.send(buf_2);
     }
-
-
     // observe_send_command_message(message)
 
     // Best to get rid of str_result_grouping in its current form from the codebase.
@@ -1113,20 +1111,15 @@ class LL_NextLevelDB_Client extends Evented_Class {
         let a = arguments,
             sig = get_a_sig(arguments);
         //console.log('observe_send_binary_message sig', sig);
-
-
         if (sig === '[n,a,o]') {
             // will need to compose the message into a buffer.
-
             let [i_command_type, arr_args, paging] = a;
             let arr_bufs_msg = [xas2(i_command_type).buffer, paging.buffer, Binary_Encoding.encode_to_buffer(arr_args)];
             //console.log('arr_bufs_msg', arr_bufs_msg);
             message = Buffer.concat(arr_bufs_msg);
             decode = true;
             remove_kp = true;
-
             //throw 'stop';
-
         } else if (sig === '[n,a,o,s]') {
             let i_command_type, arr_args, paging;
             [i_command_type, arr_args, paging, str_result_grouping] = a;
@@ -1157,9 +1150,6 @@ class LL_NextLevelDB_Client extends Evented_Class {
 
 
         // create an actual observable.
-
-
-
 
         let res = observable((next, complete, error) => {
 
@@ -1554,65 +1544,24 @@ class LL_NextLevelDB_Client extends Evented_Class {
         }
     }
 
+
+
+    // obs_send_command
+    //  observables are thenable anyway.
+
+
     // Would be nice if this could use a more standard observable...
     //  Meaning if it's just the one page coming back it gets handled in a standard way.
 
     send_command(command_message, callback) {
-        // no paging or receiving observable here?
-        //  what about combined promise and observable that is thenable?
-
         return prom_or_cb((resolve, reject) => {
-            //console.log('---pre set id');
             command_message.id = this.id_ws_req++;
-            //console.log('---post set id');
-            //console.log('send_command command_message.buffer', command_message.buffer);
-            //throw 'stop';
             this.websocket_client.send(command_message.buffer);
-
-            //console.log('command_message.id', command_message.id);
-            // Should set up the return handler.
-            // have the simplest handler, and use Command_Response_Message to decode
-
-            // Ahhhh... it's missing the message id from the buffer.
-            //  Not so clever.
             this.ws_response_handlers[command_message.id] = (buf_partial_message, message_id, buf_message) => {
-
-                //console.log('send_command response buf_message', buf_message);
-
                 let crm = new Command_Response_Message(buf_message);
-                // then look at the data inside it?
-
-                //console.log('crm.value', crm.value);
-
-                // respond with the OO Command_Response_Message
-
-                // .record
-                // .value
-
                 resolve(crm.value);
-
-
-
-
             }
         }, callback);
-        // Need to set up the return handler.
-        //  Want to set up a return handler that is as general as possible.
-
-        // want a paged / unpaged return handler.
-        //  May need to consult the command_message
-
-        // need the message id.
-        //  May as well set it within command_message
-
-        // no callback / handler?
-
-
-
-
-
-
-
     }
 
     // change to send_command(command, opt_cb)

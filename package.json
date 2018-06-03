@@ -4,11 +4,11 @@
     "license": "MIT",
     "dependencies": {
         "arr-table": "^0.0.5",
-        "binary-encoding": "^0.0.55",
+        "binary-encoding": "^0.0.56",
         "lang-mini": "^0.0.6",
         "moment": "^2.21.0",
         "my-config": "^2.0.0",
-        "nextleveldb-model": "^0.0.61",
+        "nextleveldb-model": "^0.0.62",
         "recursive-readdir": "^2.2.2",
         "request": "^2.85.0",
         "single-line-log": "^1.1.2",
