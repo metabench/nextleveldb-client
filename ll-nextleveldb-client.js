@@ -100,6 +100,9 @@ const INSERT_RECORDS = 13;
 const ENSURE_RECORD = 14;
 const ENSURE_TABLE_RECORD = 15;
 
+const GET_TABLE_RECORD_BY_KEY = 16;
+const GET_TABLE_RECORDS_BY_KEYS = 17;
+
 const DELETE_RECORDS_BY_KEYS = 18;
 const ENSURE_TABLE = 20;
 const ENSURE_TABLES = 21;
@@ -1555,7 +1558,7 @@ class LL_NextLevelDB_Client extends Evented_Class {
         }, callback);
         */
 
-        console.log('send_command callback', !!callback);
+        //console.log('send_command callback', !!callback);
         // Need to deal with unpaging here.
         //  optional unpaging processor?
         //   obs_or_cb handling that?
@@ -2179,6 +2182,14 @@ class LL_NextLevelDB_Client extends Evented_Class {
     // Will return the Record objects like on the server.
     //  Paging will be in the background. Its required (practically) for things to go smoothly on the server.
 
+    // Server-side, though, it's still using very old-style code.
+    //  That could be faster.
+    //   Could make turbo versions of functions in some cases. Like the old-style, but will be verified to do the same as the new style.
+
+    get_table_records_by_keys(table, arr_keys, callback) {
+        let cm = new Command_Message(GET_TABLE_RECORDS_BY_KEYS, [table, arr_keys], 1024);
+        return obs_or_cb(unpage(this.send_command(cm)), callback);
+    }
 
     ll_get_records_in_range(buf_l, buf_u, callback) {
         // the sig version of the obs cb.
@@ -2193,61 +2204,8 @@ class LL_NextLevelDB_Client extends Evented_Class {
         // get_table_records_by_keys seems like a useful core function, then get it running with the client.
 
 
-
-        let cm = new Command_Message(LL_GET_RECORDS_IN_RANGE, [buf_l, buf_u], 1024);
-        //console.log('cm', cm);
-
-        //console.log('* callback', callback);
-
-
-
-        // Need to set the paging option.
-        //  Maybe send_paged_command
-        //  Paging option would need to give the number of items per page.
-
-        //  unpaging hapenning within the observable would definitely be useful.
-        // unpaged_send_command?
-
-        // Nice if it can get B_Data or B_Records from the command response message.
-        return obs_or_cb(unpage(this.send_command(cm)), callback);
-        /*
-        return sig_obs_or_cb(arguments, (a, sig, next, complete, error, l) => {
-            console.log('sig', sig);
-
-            // A timer providing interim updates?
-            //  Still will need the last result.
-
-            let cm = new Command_Message(LL_GET_RECORDS_IN_RANGE, [buf_l, buf_u]);
-
-            // send_command
-            // send_paged_command
-
-            // we basically just need to send the command to the server, respond to the results properly.
-
-
-            return [];
-
-            / *
-            return [() => {
-                read_stream.destroy();
-                //res.raise('complete');
-                // or stopped without being completed?
-                complete();
-            }, () => {
-                if (!read_stream.isPaused()) {
-                    read_stream.pause();
-                    //return res.resume;
-                }
-            }, () => {
-                if (read_stream.isPaused()) {
-                    read_stream.resume();
-                }
-            }];
-            * /
-        });
-        */
-
-        return sig_obs_or_cb();
+        //let cm = new Command_Message(LL_GET_RECORDS_IN_RANGE, [buf_l, buf_u], 1024);
+        return obs_or_cb(unpage(this.send_command(new Command_Message(LL_GET_RECORDS_IN_RANGE, [buf_l, buf_u], 1024))), callback);
     }
 
     _ll_get_records_in_range(buf_l, buf_u, paging, decode = false, remove_kps = false, callback) {

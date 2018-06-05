@@ -235,9 +235,7 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
 
 
     start(callback) {
-
         // will change to async and promise.
-
         return prom_or_cb((resolve, reject) => {
 
             super.start((err, res) => {
