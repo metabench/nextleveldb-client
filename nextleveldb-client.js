@@ -244,6 +244,7 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
                 if (err) {
                     reject(err);
                 } else {
+                    //console.log('NextlevelDB_Client pre load_core');
                     this.load_core((err, model) => {
                         if (err) {
                             reject(err);
@@ -263,6 +264,9 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
      * @memberof LL_NextLevelDB_Client
      */
     get_core(callback) {
+
+        //console.log('get_core !!callback', !!callback);
+
         var buf_l = xas2(0).buffer;
         var buf_u = xas2(KP_CORE_UPPER).buffer;
         this.ll_get_records_in_range(buf_l, buf_u, callback);
@@ -338,13 +342,19 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
     load_core(callback) {
 
         return prom_or_cb((resolve, reject) => {
-            this.get_core((err, buf_core) => {
+
+            this.get_core((err, core) => {
                 if (err) {
                     reject(err);
                 } else {
                     //console.log('buf_core', buf_core);
                     //throw 'stop';
-                    this.model = Model_Database.load_buf(buf_core);
+
+                    // they are now core array records.
+
+
+
+                    this.model = Model_Database.load(core);
                     resolve(this.model);
                 }
             });
@@ -2604,23 +2614,21 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
         })
     }
 
-
+    // Needs to be fixed / improved.
+    //  Should return B_Records
 
     get_table_selection_records(table_name, arr_key_selection, callback) {
 
         let table_id = this.model.table_id(table_name);
-        //console.log('table_id', table_id);
+        console.log('table_id', table_id);
         //console.log('arr_key_selection', arr_key_selection);
 
         var buf = Model_Database.encode_key(
             table_id * 2 + 2,
             arr_key_selection
         );
-
         // And does not decode the records.
-
         return this.get_records_by_key_prefix(buf, callback);
-
         //if (callback) {
         //    obs_to_cb(res, callback);
         //} else {
