@@ -412,8 +412,6 @@ class LL_NextLevelDB_Client extends Evented_Class {
                     //reconnection_attempts();
                 });
                 client.addEventListener('close', function () {
-
-
                     console.log('echo-protocol Connection Closed');
                     //  Nice if the long response got cancelled on the server side.
 
@@ -430,8 +428,6 @@ class LL_NextLevelDB_Client extends Evented_Class {
                     if (that.auto_reconnect) {
                         reconnection_attempts();
                     }
-
-
                 });
                 client.addEventListener('message', function (message) {
                     //console.log('message', message);
@@ -463,21 +459,17 @@ class LL_NextLevelDB_Client extends Evented_Class {
                         }
                     }
                     */
-
                     //console.log('client.bufferedAmount', client.bufferedAmount);
                     if (message.type === 'binary' || message.type === 'message') {
                         that.receive_binary_message(message.data || message.binaryData);
                     }
                 });
             };
-
             assign_connection_events();
-
             if (first_connect) {
                 callback(null, true);
             };
         }
-
         //console.log('pre connect');
         //client.on('connect', on_open);
         //client.on('open', on_open);
@@ -555,7 +547,6 @@ class LL_NextLevelDB_Client extends Evented_Class {
         // Probably will be best to use a Command_Message_Response object. No need for encoding and decoding code here.
         //  Would provide a decodable object to the responder. The object would not be decoded automatically.
 
-
         // This strips out the message id.
         //  That seems a bit inefficient, would be worth changing it in the future.
         //   Could consolidate code paths to help with that.
@@ -565,11 +556,6 @@ class LL_NextLevelDB_Client extends Evented_Class {
         //  Then give the handler the Command_Response_Message
 
         // crm_handler
-
-
-
-
-
 
 
         //console.log('receive_binary_message buf_message', buf_message);
@@ -675,7 +661,6 @@ class LL_NextLevelDB_Client extends Evented_Class {
             this.ws_response_handlers[message_id](buf_the_rest, message_id, buf_message);
             this.ws_response_handlers[message_id] = null;
         }
-
     }
 
     /**
@@ -805,9 +790,7 @@ class LL_NextLevelDB_Client extends Evented_Class {
         // Encoding the message into a buffer would be very useful.
         //  
         let a = arguments;
-
         // Should not need to supply the message type - could read it.
-
         // Moving decoding out of the handler would help.
         //  Want to make a streamlined version of this with no decoding here.
         //  Decoding results won't be too hard, also can use functions and wrap functions to return decoded data.
@@ -880,8 +863,6 @@ class LL_NextLevelDB_Client extends Evented_Class {
                     ws_response_handlers[idx] = function (obj_message) {
                         //console.log('obj_message', obj_message);
                         [response_type_code, pos] = xas2.read(obj_message, pos);
-
-
                         var buf_the_rest = Buffer.alloc(obj_message.length - pos);
                         obj_message.copy(buf_the_rest, 0, pos);
 
@@ -905,7 +886,6 @@ class LL_NextLevelDB_Client extends Evented_Class {
 
                             let d1 = Binary_Encoding.decode_buffer(buf_the_rest);
                             //console.log('d1', d1);
-
                             let decoded = d1[0];
                             //console.log('decoded', decoded);
 
@@ -914,18 +894,15 @@ class LL_NextLevelDB_Client extends Evented_Class {
                         ws_response_handlers[idx] = null;
                     };
                 } else {
-
                     // setup_binary_no_paging_no_decode_handler
                     //  Just getting back a key in its own way seems strange. Could spare a byte (I suppose) to say it's a buffer.
                     //  Key paging seems useful - 
-
 
                     this.setup_binary_no_paging_no_decode_handler(idx, callback);
                 }
                 // could remove the response handler here
             }
             // The response handler itself could be an observable object.
-
 
             if (message_type === BINARY_PAGING_FLOW) {
                 ws_response_handlers[idx] = function (obj_message, page_number) {
@@ -943,9 +920,7 @@ class LL_NextLevelDB_Client extends Evented_Class {
             }
 
             if (message_type === RECORD_PAGING_NONE) {
-
                 // Server not returning records right?
-
                 if (decode) {
                     ws_response_handlers[idx] = function (obj_message) {
                         [response_type_code, pos] = xas2.read(obj_message, pos);
@@ -976,9 +951,7 @@ class LL_NextLevelDB_Client extends Evented_Class {
             // Need to be able to handle this without decoding
 
             if (message_type === RECORD_PAGING_FLOW) {
-
                 // Has filtered out the page number already?
-
                 if (decode) {
                     console.trace();
                     throw 'NYI';
@@ -1000,12 +973,9 @@ class LL_NextLevelDB_Client extends Evented_Class {
                 };
                 // could remove the response handler here
             }
-
-
             // KEY PAGING
 
             if (message_type === KEY_PAGING_NONE) {
-
                 if (decode) {
                     ws_response_handlers[idx] = function (obj_message) {
                         [response_type_code, pos] = xas2.read(obj_message, pos);
@@ -1583,12 +1553,27 @@ class LL_NextLevelDB_Client extends Evented_Class {
                 // just pass on the response message.
                 //  It would go to unpage though.
 
+                // RECORD_PAGING_NONE
 
-                console.log('crm.id', crm.id);
+                // Then is_last should not be relevant.
+
+                //console.log('crm.paged', crm.paged);
+
+
+                if (crm.paged) {
+                    crm.is_last ? [next(crm.value), complete()] : next(crm.value);
+                } else {
+                    complete(crm.value);
+                }
+
+
+
+                //console.log('crm.id', crm.id);
+                //console.log('crm.is_last', crm.is_last);
                 // want to decode it here I think.
                 //  Keeping data encoded would have some uses though, such as getting back messages.
 
-                crm.is_last ? [next(crm), complete()] : next(crm);
+
 
 
 
@@ -2906,7 +2891,7 @@ class LL_NextLevelDB_Client extends Evented_Class {
         //console.log('decode', decode);
         //throw 'stop';
         let obs_res = this.observe_send_binary_message(buf_query, decode);
-        console.log('obs_res', obs_res);
+        //console.log('obs_res', obs_res);
         //throw 'stop';
         if (callback) {
             throw 'NYI'

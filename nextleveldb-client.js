@@ -338,9 +338,7 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
      * @memberof NextlevelDB_Client
      */
     load_core(callback) {
-
         return prom_or_cb((resolve, reject) => {
-
             this.get_core((err, core) => {
                 if (err) {
                     reject(err);
@@ -357,8 +355,6 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
                 }
             });
         }, callback);
-
-
     }
 
     load_buf_core(callback) {
@@ -1361,27 +1357,41 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
     //  It would be made available to the client.
 
     table_pk_lookup(table_name, index_id, value, callback) {
-        return prom_or_cb((resolve, reject) => {
 
-            var t_value = tof(value);
+        // Make it more versitile, so it can accept a field name as it's index id
+
+
+
+        return prom_or_cb((resolve, reject) => {
+            let t_index_id = tof(index_id);
+            let _index_id;
 
             if (!this.model) {
                 console.trace();
                 throw "expected: this.model";
             }
+            let model_table = this.model.map_tables[table_name];
+            let table_kp = model_table.key_prefix;
 
-            var table_kp = this.model.map_tables[table_name].key_prefix;
+            if (t_index_id === 'string') {
+                _index_id = this.model.tables_
+            } else if (t_index_id === 'number') {
+                _index_id = index_id;
+            } else {
+                console.trace();
+                throw 'NYI';
+            }
+            var t_value = tof(value);
+
 
             if (t_value === "array") {
                 console.trace();
                 throw "yet to implement";
             } else {
-
                 var buf_idx_key = Model_Database.encode_index_key(
                     table_kp + 1,
                     index_id, [value]
                 );
-
                 //console.log('buf_idx_key', buf_idx_key);
 
                 this.ll_get_keys_beginning(buf_idx_key, (err, ll_res) => {
@@ -1408,8 +1418,11 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
             }
 
         }, callback);
-
     }
+
+    // lookup by field name...
+
+
 
     table_record_lookup(table_name, index_id, value, callback) {
         //console.log('1) table_record_lookup');
@@ -1417,9 +1430,15 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
             (async () => {
                 //console.log('2) table_record_lookup');
 
-
+                // Can this lookup based on the index name?
 
                 let arr_pk_ref = await this.table_pk_lookup(table_name, index_id, value);
+                //  // b_record to object?
+                //   then that object is used as a spec for different type of object.
+                //  .obj
+                //   decode, but put the fields with their values along with their names.
+
+
                 //console.log('arr_pk_ref', arr_pk_ref);
 
                 // if it can't be found...
@@ -1441,9 +1460,6 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
                 } else {
                     resolve(undefined);
                 }
-
-
-
 
             })();
         }, callback);
