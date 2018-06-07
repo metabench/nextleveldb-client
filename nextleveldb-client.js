@@ -1034,19 +1034,21 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
 
     // key beginning rather than key prefix
     //  could be the full key
+
+
     get_table_records_by_key(table_name, key, callback) {
-        this.get_table_kp_by_name(table_name, (err, kp) => {
-            // then encode a buffer with that kp and key
-            let buf_key = Model_Database.encode_key(kp, key);
-            //console.log('buf_key', buf_key);
 
-            // then search by key (prefix)
-            //  it's the beginning of the key.
+        let kp = this.model.map_tables_by_id[this.model.table_id(table_name)].kp;
 
-            this.get_records_by_key_prefix(buf_key, callback);
+        let buf_key = Model_Database.encode_key(kp, key);
+        console.log('kp', kp);
+        console.log('buf_key', buf_key);
+        console.log('callback', callback);
 
-            //throw 'stop';
-        });
+        // then search by key (prefix)
+        //  it's the beginning of the key.
+
+        return this.get_records_by_key_prefix(buf_key, callback);
     }
 
 
