@@ -11,7 +11,6 @@
 // Assets client could be used to check specific functionality is working OK.
 //  Have long-winded and laborious methods to resolve the problems.
 
-
 const fs = require("fs");
 const os = require("os");
 
@@ -123,8 +122,6 @@ const obs_to_cb = (obs, callback) => {
     obs.on('complete', () => callback(null, arr_all));
 }
 
-
-
 //  this starts with a callback inside, which is not how newer functions will generally be written.
 // cb_to_prom_or_cb
 const cb_to_prom_or_cb = (inner_with_cb, opt_cb) => {
@@ -142,7 +139,6 @@ const cb_to_prom_or_cb = (inner_with_cb, opt_cb) => {
         })
     }
 }
-
 
 var directory_exists = function (path, callback) {
     fs.stat(resolve(path), function (err, stat) {
@@ -347,9 +343,6 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
                     //throw 'stop';
 
                     // they are now core array records.
-
-
-
                     this.model = Model_Database.load(core);
                     resolve(this.model);
                 }
@@ -377,8 +370,6 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
             } else {
                 //console.log('buf_core', buf_core);
                 let res = [Model_Database.load(buf_core), Model_Database.load(buf_core)];
-
-
                 callback(null, res);
             }
         });
@@ -838,6 +829,12 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
     // count_records_by_key_prefix_up_to
     count_records_by_key_prefix_up_to(i_kp, limit, callback) {
         console.log('count_records_by_key_prefix_up_to i_kp', i_kp);
+
+
+        let [buf_l, buf_u] = kp_to_range(xas2(i_kp).buffer);
+
+
+        /*
         var buf_kp = xas2(i_kp).buffer;
         var buf_0 = Buffer.alloc(1);
         buf_0.writeUInt8(0, 0);
@@ -847,6 +844,7 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
 
         var buf_l = Buffer.concat([buf_kp, buf_0]);
         var buf_u = Buffer.concat([buf_kp, buf_1]);
+        */
 
         this.ll_count_keys_in_range_up_to(buf_l, buf_u, limit, (err, res_count) => {
             if (err) {
@@ -874,6 +872,10 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
         //console.log('count_keys_beginning');
         //console.log('buf_key_beginning', buf_key_beginning);
 
+        let [buf_l, buf_u] = kp_to_range(buf_key_beginning);
+
+        /*
+
         var buf_0 = Buffer.alloc(1);
         buf_0.writeUInt8(0, 0);
         var buf_1 = Buffer.alloc(1);
@@ -882,6 +884,8 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
 
         var buf_l = Buffer.concat([buf_key_beginning, buf_0]);
         var buf_u = Buffer.concat([buf_key_beginning, buf_1]);
+        */
+
 
         if (callback) {
             this.ll_count_keys_in_range(buf_l, buf_u, callback);
@@ -1037,13 +1041,11 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
 
 
     get_table_records_by_key(table_name, key, callback) {
-
         let kp = this.model.map_tables_by_id[this.model.table_id(table_name)].kp;
-
         let buf_key = Model_Database.encode_key(kp, key);
-        console.log('kp', kp);
-        console.log('buf_key', buf_key);
-        console.log('callback', callback);
+        //console.log('kp', kp);
+        //console.log('buf_key', buf_key);
+        //console.log('callback', callback);
 
         // then search by key (prefix)
         //  it's the beginning of the key.
@@ -1056,8 +1058,6 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
     //  The subdivisions could also have KPs stripped from the beginnings.
 
     // Having a server-side function provide binary data by default could lead to some faster (but more difficult) processing.
-
-
 
     //get_table_key_subdivisions(table, decode = true, callback) {
     get_table_key_subdivisions(table, callback) {
@@ -1078,10 +1078,6 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
         //  However, we are dealing with index values in this function which work matching against each other when encoded.
         //   decoding and re-encoding makes more overhead, leaving data encoded is the answer when it comes to perf.
 
-
-
-
-
         // Will call the server function to do this.
         //  Want to make a concise new-school server function.
         //  Want a concise way of calling it too.
@@ -1090,11 +1086,8 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
         // default decoding.
         // Send with decoding being true?
         // obs_separate
-
         // OO message system will come fairly soon, but it's worth getting a few more code paths working / upgraded with what we have already.
-
         // obs_unpage
-
 
         //let obs_unpage_binary = 
 
@@ -1107,17 +1100,13 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
                 //console.log('obs_unpage_buffer buf', buf);
 
                 let arr_bufs = Binary_Encoding.split_encoded_buffer(buf);
-
-
                 //console.log('obs_unpage_buffer arr_bufs', arr_bufs);
                 //throw 'stop';
                 // need to split up a buffered array, without decoding it?
                 //  binary_encoding.split_array_encoded_buffer
                 //   splits it to other encoded buffers - gets the items out of the array
                 //console.log('arr', arr);
-
                 // 
-
                 each(arr_bufs, item => res.raise('next', item))
             });
             obs.on('error', () => res.raise('error'));
@@ -1129,13 +1118,8 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
         //  Every item result encoded to be separate.
         //   It does seem worth having these multiple encoding levels.
         //   May want to get the individual binary results without destructuring / decoding the structure
-
-
         // Observable that does one level of decoding...?
-
         //  Condidering what is in the envelope, 
-
-
         let obs_decode_message_envelope = obs => {
             let res = new Evented_Class();
             obs.on('next', buf => {
@@ -1143,57 +1127,32 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
                 //  binary_encoding.split_array_encoded_buffer
                 //   splits it to other encoded buffers - gets the items out of the array
                 //console.log('arr', arr);
-
                 // Could the data have been wrongly double-encoded as an array while sending server-side?
                 //  Possibly to compensate for a previous decoding problem?
-
                 // So don't have these again encoded as arrays?
                 //  We know they are arrays, so just decode them into that by default.
-
                 // Maybe the result has been needlessly double-encoded.888
-
                 //console.log('obs_decode_message_envelope buf', buf);
                 //console.log('obs_decode_message_envelope buf.length', buf.length);
-
                 // Buffers are encoded within the envelope.
 
-
-
-
                 // Looks like a likely bug with how it was encoded on the server.
-
-
                 // Standard decode of what's in the envelope
                 let decoded = Binary_Encoding.decode_buffer(buf)[0];
-
                 // Getting an error here if there is still a kp on the server?
                 //  First key needs to be encoded as a buffer?
-
-
-
                 //console.log('decoded', decoded);
-
                 // Still need server-side kp removal from result?
                 //  Then 
                 let decoded2 = Binary_Encoding.decode_buffer(decoded)[0];
-
                 //console.log('* decoded2', decoded2);
-
                 //let decoded_3 = Binary_Encoding.decode_buffer(decoded2[0]);
-
                 // Yes these buffers need to be available for decoding.
                 //  Could the first and last key lookup be going wrong?
-
-
-
-
                 //console.log('decoded_3', decoded_3);
-
                 // Envelope should have an array of items inside.
                 //  Those items may stay encoded.
                 //   Items to stay encoded need to be encoded with a Buffer type
-
-
                 res.raise('next', decoded2);
             });
             obs.on('error', () => res.raise('error'));
@@ -1201,41 +1160,22 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
             return res;
         }
 
-
-
         // An observable then for decoding the message envelope.
         //  Then we may still have the encoded data and could run it through a decode message data process.
         //  For the moment, we want to get the data back in the same format that the server gives when directly calling a function, still not decoding.
         //   Decoding the message envelope is different to decoding the message itself.
 
-
-
         // obs_separate
-
         // Then decoding messages is a different matter.
-
         // 
-
         // and could decode the key search beginning and also the internal buffers.
-        //  
-
-
+        //
         let obs_send = obs_decode_message_envelope(obs_unpage_buffer(this.send(GET_TABLE_KEY_SUBDIVISIONS, [this.model.table_id(table)])));
-
         // could add a getter for the 'decoded' property.
-
-
-
         //obs.decode = function
-
-
-
         // Decoding option.
-
         //let res;
         // and then decode?
-
-
         /*
         decode = false;
         if (decode) {
@@ -1252,9 +1192,6 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
         // Want the page->separate observable processor.
         //  We don't decode the values here, so they are all stuck together.
         //  Look at receiving pages of data, then un-paging them as they come back to the client.
-
-
-
         console.log('get_table_key_subdivisions !!callback', !!callback);
         if (callback) {
             let res_all = [];
@@ -1271,17 +1208,13 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
             obs_send.on('error', err => {
                 callback(err);
             });
-
             //throw 'NYI';
         } else {
             return obs_send;
         }
     }
 
-
-
     // get_table_flat_records
-
     // does not separate the key and value.
 
     // getting an Arr_Table of the table records
@@ -1304,14 +1237,12 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
                         callback(err);
                     } else {
                         // flatten kvps
-
                         var flat_records = [];
                         each(table_records, record => {
                             flat_records.push(record[0].concat(record[1]));
                         });
                         //console.log('flat_records', flat_records);
                         //console.log('table.field_names', table.field_names);
-
                         var res = new Array_Table([table.field_names, flat_records]);
                         callback(null, res);
                     }
@@ -1351,19 +1282,12 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
             }
         });
     }
-
     // get_table_kv_field_names
-
-
     // This should be made into a core function that runs on the server
     //  It would be made available to the client.
 
     table_pk_lookup(table_name, index_id, value, callback) {
-
         // Make it more versitile, so it can accept a field name as it's index id
-
-
-
         return prom_or_cb((resolve, reject) => {
             let t_index_id = tof(index_id);
             let _index_id;
@@ -1384,8 +1308,6 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
                 throw 'NYI';
             }
             var t_value = tof(value);
-
-
             if (t_value === "array") {
                 console.trace();
                 throw "yet to implement";
@@ -1395,7 +1317,6 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
                     index_id, [value]
                 );
                 //console.log('buf_idx_key', buf_idx_key);
-
                 this.ll_get_keys_beginning(buf_idx_key, (err, ll_res) => {
                     if (err) {
                         //console.log('err', err);
@@ -1418,13 +1339,10 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
                 });
                 //Model.Database.enc
             }
-
         }, callback);
     }
 
     // lookup by field name...
-
-
 
     table_record_lookup(table_name, index_id, value, callback) {
         //console.log('1) table_record_lookup');
@@ -1452,12 +1370,9 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
                     //let table_id = this.model.table_id(table_name);
                     let k = new Model.BB_Key(arr_pk_ref);
                     //console.log('k', k);
-
                     // then get, using that key.
-
                     let record = await this.get_record(k);
                     //console.log('record', record);
-
                     resolve(record);
                 } else {
                     resolve(undefined);
@@ -1480,20 +1395,13 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
     // record id
     table_index_lookup(table_name, index_id, value, callback) {
         // only looking up one value in the index for the moment?
-
         //  could also look at an array of values.
-
         // only will get one record.
-
         // will return promise if no callback is used.
-
-
         //let inner = 
         return cb_to_prom_or_cb((callback) => {
-
             //console.log('table_index_lookup');
             //console.log('value', value);
-
             (async () => {
                 let arr_pk_ref = await this.table_pk_lookup(table_name, index_id, value);
                 if (arr_pk_ref.length === 1) {
@@ -1504,8 +1412,6 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
             })();
         }, callback);
     }
-
-
 
     /**
      *
@@ -1540,19 +1446,15 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
     }
 
     get_table_last_key(table_name, callback) {
-
-
         let table_id = this.model.table_id(table_name);
         var kp = table_id * 2 + 2;
         var buf_key = xas2(kp).buffer;
-
         //console.log('pre ll_get_last_key_beginning ', buf_key);
         this.ll_get_last_key_beginning(buf_key, (err, res_last_key) => {
             if (err) {
                 callback(err);
             } else {
                 // Does not decode the result here.
-
                 //console.log('res_last_key', res_last_key);
                 callback(null, res_last_key);
             }
@@ -1565,11 +1467,9 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
                 callback(err);
             } else {
                 //console.log('last_key', last_key);
-
                 let decoded_last_key = database_encoding.decode_key(last_key);
                 //console.log('decoded_last_key', decoded_last_key);
                 decoded_last_key.shift();
-
                 if (decoded_last_key.length === 1) {
                     callback(null, decoded_last_key[0]);
                 } else {
@@ -1622,11 +1522,8 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
             if (table) {
                 var kp = table.key_prefix;
                 //
-
                 //console.log('kp', kp);
-
                 // ll get records by key prefix - maybe it should do more decoding of the results buffer? 
-
                 this.ll_get_records_by_key_prefix(kp + 1, callback);
             } else {
                 callback("Table " + table_name + " not found");
@@ -1651,17 +1548,12 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
             } else {
                 // That ll function did not split up the records.
                 var row_buffers = Binary_Encoding.get_row_buffers(index_records);
-
-
                 var decoded_index_records = Model_Database.decode_model_rows(row_buffers);
                 //console.log('decoded_index_records', decoded_index_records);
                 callback(null, decoded_index_records);
             }
         });
     }
-
-
-
     // cs = client_side
 
     cs_update_record_update_indexes(arr_record_current, arr_record_new, callback) {
@@ -1743,25 +1635,9 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
 
         // scan_key_range_malformed_indexes
         //  could be done server-side, and only returns indexes which have got a problem.
-
         // Getting back access to the data that has been harvested for over a month will be extremely useful.
         //  Will do comprehensive testing, then a comprehensive upgrade that will carry out diagnosis upon start.
-
-
         //this.ll_delete_and_put(old_keys, new_rows, callback);
-
-
-
-
-
-
-
-
-
-
-
-
-
 
         //this.ll_delete_and_put(old_keys, new_rows, callback);
 
@@ -1769,14 +1645,7 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
         //  Finding missing currency record currency codes would be useful.
 
         // It would use bittrex watcher to download the currency codes.
-
-
-
-
     }
-
-
-
 
     get_table_kp_by_name(table_name, callback) {
         //console.log('get_table_kp_by_name table_name', table_name);
@@ -1833,7 +1702,6 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
             }
         });
     }
-
 
     // could just be table selection
     get_table_field_names_by_table_id(table_id, callback) {
@@ -1943,10 +1811,7 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
                         } else {
                             //console.log('fields_records', fields_records);
 
-                            let res_keys = [];
-                            let res_values = [];
-                            let res = [res_keys, res_values];
-                            let is_pk;
+                            let res_keys = [], res_values = [], res = [res_keys, res_values], is_pk;
 
                             // So the fields records just have values...?
                             each(fields_records, record => {
@@ -2191,17 +2056,13 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
         let buf_query = Binary_Encoding.encode_to_buffer(arr_query);
         console.log("buf_query", buf_query);
     }
-
     // test this more fully.
-
     //  It's worth making a test database to try this out.
 
     // A few things would benefit from using a test db, maybe US presidents data.
     //  Linked to some info about political parties maybe.
 
     // Trying a whole bunch of operations using await etc, checking the results.
-
-
 
     insert_table_record(table_name, arr_record, callback) {
         let that = this;
@@ -2229,9 +2090,6 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
                     arr_query.slice(1),
                     arr_query[0]
                 );
-
-                //console.log("buf_query", buf_query);
-
                 that.send_binary_message(buf_query, (err, res_query) => {
                     if (err) {
                         callback(err);
@@ -2278,7 +2136,6 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
             } else {
                 console.log('records', records);
                 throw 'stop';
-
             }
         })
     }
@@ -2297,16 +2154,13 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
     // get_table_indexes_table_records
     get_table_indexes_records(table_name, callback) {
         const that = this;
-
         //let table_indexes_id = 3;
         let table_indexes_kp = TABLE_INDEXES_TABLE_ID * 2 + 2;
-
         that.get_table_id_by_name(table_name, (err, table_id) => {
             if (err) {
                 callback(err);
             } else {
                 // Then get the map fields for that table.
-
                 that.get_map_table_field_names_by_id_by_table_id(
                     table_id,
                     (err, map_field_names) => {
@@ -2335,13 +2189,10 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
         // TABLE_FIELDS_TABLE_ID
 
         const that = this;
-
         //let table_indexes_id = 3;
         let table_indexes_kp = TABLE_INDEXES_TABLE_ID * 2 + 2;
         //let that = this;
-
         // Get the fields map for the table.
-
         //that.get_map_table_field_names_by_id();
 
         that.get_table_id_by_name(table_name, (err, table_id) => {
@@ -2349,7 +2200,6 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
                 callback(err);
             } else {
                 // Then get the map fields for that table.
-
                 that.get_map_table_field_names_by_id_by_table_id(
                     table_id,
                     (err, map_field_names) => {
@@ -2357,12 +2207,10 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
                             callback(err);
                         } else {
                             //console.log('* map_field_names', map_field_names);
-
                             let buf_key = Model_Database.encode_key(table_indexes_kp, [
                                 table_id
                             ]);
                             //console.log('buf_key', buf_key);
-
                             // then get all records beginning with that key
                             that.get_records_by_key_prefix(buf_key, (err, records) => {
                                 if (err) {
@@ -2397,9 +2245,6 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
             }
         });
     }
-
-
-
 
     // Would like to use paging in the background, but get the results back one at a time in the API.
     //  Saves having to write an each() around the results set, though for loops would be more performant. 
@@ -2459,8 +2304,6 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
                     this.get_keys_by_key_prefix(kp, decode, callback);
                 } else {
                     let obs = this.get_keys_by_key_prefix(kp, paging, decode, true);
-
-
                     let data_pages = [];
                     obs.on('next', data => {
                         obs_res.raise('next', data);
@@ -2529,7 +2372,6 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
 
     }
 
-
     // remove this.
     count_table_records_up_to(table_name, limit, callback) {
         if (this.model) {
@@ -2552,7 +2394,6 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
                 } else {
                     let kp = table_id * 2 + 2;
                     this.count_records_by_key_prefix_up_to(kp, limit, callback);
-
                 }
             });
         }
@@ -2634,11 +2475,9 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
     //  Should return B_Records
 
     get_table_selection_records(table_name, arr_key_selection, callback) {
-
         let table_id = this.model.table_id(table_name);
         console.log('table_id', table_id);
         //console.log('arr_key_selection', arr_key_selection);
-
         var buf = Model_Database.encode_key(
             table_id * 2 + 2,
             arr_key_selection
@@ -2680,7 +2519,6 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
             }
         } else {
             // an observable will be the result.
-
             var table = this.model.map_tables[table_name];
             if (table) {
                 var kp = table.key_prefix;
@@ -2689,7 +2527,6 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
             } else {
                 throw new Error("Table " + table_name + " not found");
             }
-
         }
     }
 
@@ -2728,20 +2565,14 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
     //  Then the matching info will be sent from the client to the server.
     //   Matching info could be part of extended options, as it operates on the results set.
 
-
-
     // matching records against values for retrieval seems important
     //  seems a lot like a 'where' clause in SQL.
 
     select_from_table(table, arr_fields, paging, decode = true, callback) {
-
-
         // want to track the specified paging too.
         //  We may use one type of paging to communicate with the server, and another type of paging for the results.
         //  Individual results seem more useful.
-
         // results as 'single' or 'page'
-
         let result_grouping = 'single';
         let a = arguments,
             sig = get_a_sig(a);
@@ -2753,9 +2584,7 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
             paging = new Paging.Record(1024);
             // by default lets get 1024 records at once.
         }
-
         // Use an unpager here if we don't want the paged records back.
-
         // Want to have paging handled under the surface for many operations.
         //  Getting back decodable records would be the best default. Often these records will just need to be sent on somewhere.
 
@@ -2774,42 +2603,26 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
     //  These records here are kv arrays.
 
     get_record(key, callback) {
-
         /*
         return prom_or_cb((resolve, reject) => {
-
         }, callback);
         */
-
         //console.log('key.buffer', key.buffer);
-
         return prom_or_cb(async (resolve, reject) => {
             //(async () => {
-
             let got_record = await this.ll_get_record(key.buffer || key);
-
             if (got_record) {
                 let bbr = new Model.BB_Record(got_record);
                 resolve(bbr);
             } else {
                 resolve(undefined);
             }
-
-
-
             //})();
-
         }, callback);
-
         //return this.ll_get_record(key.buffer || key, callback);
-
-
-
     }
 
     // Could make more flexibility on return types.
-
-
     get_table_record(table_name, arr_key, callback) {
         this.get_table_kp_by_name(table_name, (err, kp) => {
             if (err) {
@@ -2820,7 +2633,6 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
                     if (err) {
                         callback(err);
                     } else {
-
                         if (ll_res && ll_res.length > 0) {
                             let arr_bufs_kv = Binary_Encoding.split_length_item_encoded_buffer_to_kv(ll_res);
                             let remove_kp = true;
@@ -2829,9 +2641,6 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
                         } else {
                             callback(null, undefined);
                         }
-
-                        //let num_xas2_prefixes = 0;
-
                     }
                 })
             }
@@ -2861,24 +2670,19 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
         //  Need to update incrementor values in some cases though.
 
         // and the pk incrementor record if there is one.
-
         let bufs;
-
         bufs = model_record.to_arr_buffer_with_indexes();
         let buf3;
         if (model_record.table.pk_incrementor) {
             //console.log('[Model_Database.encode_model_rows(bufs), model_record.table.pk_incrementor.get_record_bin()]', [Model_Database.encode_model_rows(bufs), Model_Database.encode_model_rows(model_record.table.pk_incrementor.get_record_bin())]);
             //let bufs2 = Array.concat()
             // This part does not seem quite right.
-
             //console.log('bufs', bufs);
             let inc_record_bin = model_record.table.pk_incrementor.get_record_bin();
             //console.log('inc_record_bin', inc_record_bin);
-
             bufs.push(inc_record_bin);
             //throw 'stop';
             buf3 = Model_Database.encode_model_rows(bufs);
-
             //buf3 = Buffer.concat([Model_Database.encode_model_rows(bufs), Model_Database.encode_model_rows(model_record.table.pk_incrementor.get_record_bin())]);
         } else {
             buf3 = Model_Database.encode_model_rows(bufs);
@@ -2904,11 +2708,9 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
             var res = {};
             if (i_sub_evt_type === SUB_CONNECTED) {
                 console.log("Connected!");
-
                 // When it is connected, we return the subscription id.
                 //console.log('i_num', i_num);
                 // May need the subscription number to unsubscribe.
-
                 res.type = "connected";
                 res.client_subscription_id = i_num;
                 res.id = i_num;
@@ -2920,7 +2722,6 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
                 var row_buffers = Binary_Encoding.get_row_buffers(buf_the_rest);
                 var decoded_row_buffers = Model_Database.decode_model_rows(row_buffers);
                 res.records = decoded_row_buffers;
-
                 subscription_event_handler(res);
             }
         });
@@ -2937,11 +2738,9 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
                 [i_num, pos] = xas2.read(ll_subscription_event, pos);
                 [i_sub_evt_type, pos] = xas2.read(ll_subscription_event, pos);
                 //console.log('[i_num, i_sub_evt_type]', [i_num, i_sub_evt_type]);
-
                 var buf_the_rest = Buffer.alloc(ll_subscription_event.length - pos);
                 ll_subscription_event.copy(buf_the_rest, 0, pos);
                 //console.log('ll_subscription_event.length', ll_subscription_event.length);
-
                 var res = {};
                 if (i_sub_evt_type === SUB_CONNECTED) {
                     console.log("Connected");
@@ -3013,9 +2812,6 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
         return res;
     }
 
-
-
-
     get_table_record_pk_by_index_lookup(table_name, index_field_name, index_field_value, callback) {
         let table = this.model.map_tables[table_name];
 
@@ -3023,10 +2819,10 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
         let table_kp = table_id * 2 + 2;
         let table_ikp = table_kp + 1;
         //console.log('index_field_name', index_field_name);
-        let field_id = table.map_fields[index_field_name].id;
+        //let field_id = ;
         //console.log('***field_id', field_id);
-        let index_id = table.get_index_id_by_field_id(field_id);
-        let idx_beginning = new Key([table_ikp, index_id, index_field_value]);
+        //let index_id = ;
+        let idx_beginning = new Key([table_ikp, table.get_index_id_by_field_id(table.map_fields[index_field_name].id), index_field_value]);
         //console.log('idx_beginning', idx_beginning);
         //console.log('idx_beginning.buffer', idx_beginning.buffer);
         // then do the lookup
@@ -3215,12 +3011,8 @@ var new_backup_path = (name, callback) => {
     var path_backups = user_dir + "/NextLevelDB/backups";
     path_backups = path_backups.split("\\").join("/");
     //console.log('path_backups', path_backups);
-
-    // ensure that directory exists.
-
     ensure_directory_exists(path_backups, (err, res) => {
         //console.log('res', res);
-
         if (err) {
             callback(err);
         } else {
@@ -3229,9 +3021,7 @@ var new_backup_path = (name, callback) => {
                     callback(err);
                 } else {
                     //console.log('dirs', dirs);
-
                     //console.log('2* path_backups', path_backups);
-
                     if (dirs.length === 0) {
                         //console.log()
                         callback(null, path_backups + "/0000 " + name);
@@ -3241,13 +3031,10 @@ var new_backup_path = (name, callback) => {
                         var last = dirs[dirs.length - 1];
                         var str_num = last.split(" ")[0];
                         //console.log('str_num', str_num);
-
                         var i_num = parseInt(str_num, 10);
                         i_num++;
-
                         var s_num = pad(i_num, 4);
                         //console.log('s_num', s_num);
-
                         var res_path = path_backups + "/" + s_num + " " + name;
                         //console.log('res_path', res_path);
                         //throw 'stop';
@@ -3403,15 +3190,9 @@ if (require.main === module) {
                 obs_table_records.on('complete', data => {
                     //console.log('data', data);
                     console.log('completed data.length', data.length);
-
                     // Don't get the last data again.
                     //obs_res.raise('complete', data);
-
-
                     //console.log('completed data (last page)', data);
-
-
-
                     //let all_records = [].concat.apply([], data_pages);
                     //console.log('all_records.length', all_records.length);
                 });
@@ -3421,9 +3202,7 @@ if (require.main === module) {
             //test_paged_get_table_records('bittrex currencies');
 
             let test_paged_get_table_keys = table_name => {
-
                 let obs_table_records = lc.get_table_keys(table_name, true);
-
                 // Auto data amalgamation, or use the observable as a stream.
 
                 obs_table_records.on('next', data => {

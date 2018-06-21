@@ -21,6 +21,8 @@
 // General rule-of-thumb:
 //  If we have encoding or decoding taking place here, we could use the Buffer-Backed classes instead.
 
+// 21/06/2018 - Made good progress. More work on putting batches of active / newly generated active records.
+
 
 
 const http = require('http');
@@ -58,6 +60,7 @@ const Model = require("nextleveldb-model");
 const Model_Database = Model.Database;
 const Command_Message = Model.Command_Message;
 const Command_Response_Message = Model.Command_Response_Message;
+const database_encoding = Model.database_encoding;
 
 //console.log('encodings.poloniex.market', encodings.poloniex.market);
 const Paging = Model.Paging;
@@ -557,17 +560,13 @@ class LL_NextLevelDB_Client extends Evented_Class {
 
         // crm_handler
 
-
         //console.log('receive_binary_message buf_message', buf_message);
         var message_id, pos = 0,
             message_type;
         [message_id, pos] = xas2.read(buf_message, pos);
 
         //console.log('1) message_id', message_id);
-
         // A hander that receives the full message...
-
-
 
         var buf_the_rest = Buffer.alloc(buf_message.length - pos);
         buf_message.copy(buf_the_rest, 0, pos);
@@ -586,10 +585,6 @@ class LL_NextLevelDB_Client extends Evented_Class {
 
         if (return_message_type) {
             //console.log('buf_the_rest', buf_the_rest);
-
-
-
-
             if (message_type === BINARY_PAGING_NONE) {
 
                 // Could even strip the paging / structure flag here.
@@ -981,12 +976,9 @@ class LL_NextLevelDB_Client extends Evented_Class {
                         [response_type_code, pos] = xas2.read(obj_message, pos);
                         var buf_the_rest = Buffer.alloc(obj_message.length - pos);
                         obj_message.copy(buf_the_rest, 0, pos);
-
                         // decode this buffer, it's binary encoding.
-
                         //console.log('buf_the_rest', buf_the_rest);
                         //console.log('buf_the_rest.length', buf_the_rest.length);
-
                         //let decoded = Binary_Encoding.decode(buf_the_rest);
 
                         var row_buffers = Binary_Encoding.get_row_buffers(buf_the_rest);
@@ -1003,7 +995,6 @@ class LL_NextLevelDB_Client extends Evented_Class {
 
                         let buf_the_rest = Buffer.alloc(obj_message.length - pos);
                         obj_message.copy(buf_the_rest, 0, pos);
-
                         // Remove the paging info from it.
 
                         // Could look in the response to see what message we have, if it indicates paging.
@@ -1016,8 +1007,6 @@ class LL_NextLevelDB_Client extends Evented_Class {
                 // could remove the response handler here
             }
             // The response handler itself could be an observable object.
-
-
             if (message_type === KEY_PAGING_FLOW) {
                 ws_response_handlers[idx] = function (obj_message, page_number) {
                     console.log('PAGING_FLOW obj_message', obj_message);
@@ -1046,7 +1035,6 @@ class LL_NextLevelDB_Client extends Evented_Class {
                 };
                 // could remove the response handler here
             }
-
         } else {
             //console.log('*** idx', idx);
             ws_response_handlers[idx] = function (obj_message) {
@@ -1106,13 +1094,8 @@ class LL_NextLevelDB_Client extends Evented_Class {
             message_type, response_type_code, page_number = 0;
 
         var buf_2 = Buffer.concat([xas2(idx).buffer, message]);
-
-
         // create an actual observable.
-
         let res = observable((next, complete, error) => {
-
-
             ws_response_handlers[idx] = (obj_message) => {
                 pos = 0;
                 [message_type, pos] = xas2.read(obj_message, pos);
@@ -1123,9 +1106,7 @@ class LL_NextLevelDB_Client extends Evented_Class {
                     //throw 'stop';
 
                     if (message_type === BINARY_PAGING_NONE) {
-
                         console.log('BINARY_PAGING_NONE', BINARY_PAGING_NONE);
-
                         var buf_the_rest = Buffer.alloc(obj_message.length - pos);
                         obj_message.copy(buf_the_rest, 0, pos);
                         //console.log('buf_the_rest', buf_the_rest);
@@ -1155,8 +1136,6 @@ class LL_NextLevelDB_Client extends Evented_Class {
                             res.raise('next', decoded);
                         }
                         //console.log('decoded', decoded);
-
-
                         this.send_message_receipt(idx, page_number);
                     }
                     if (message_type === BINARY_PAGING_LAST) {
@@ -1280,10 +1259,6 @@ class LL_NextLevelDB_Client extends Evented_Class {
                         this.send_message_receipt(idx, page_number);
                     }
                     if (message_type === KEY_PAGING_LAST) {
-
-                        // 
-
-
                         var buf_the_rest = Buffer.alloc(obj_message.length - pos);
                         obj_message.copy(buf_the_rest, 0, pos);
                         [page_number, pos] = xas2.read(buf_the_rest, 0);
@@ -1336,11 +1311,8 @@ class LL_NextLevelDB_Client extends Evented_Class {
                         var buf_the_rest = Buffer.alloc(obj_message.length - pos);
                         obj_message.copy(buf_the_rest, 0, pos);
 
-
                         if (res.unpaged || str_result_grouping === 'single') {
-
                             // Split.
-
                             let arr_bufs_kv = Binary_Encoding.split_length_item_encoded_buffer_to_kv(buf_the_rest);
                             each(arr_bufs_kv, item => res.raise('next', item));
                             //let s = Binary_Encoding.spli
@@ -1349,9 +1321,6 @@ class LL_NextLevelDB_Client extends Evented_Class {
                         } else {
                             res.raise('next', buf_the_rest);
                         }
-
-
-
                         this.send_message_receipt(idx, page_number++);
                     }
                     if (message_type === RECORD_PAGING_LAST) {
@@ -1389,62 +1358,14 @@ class LL_NextLevelDB_Client extends Evented_Class {
         })
         this.websocket_client.send(buf_2);
         return res;
-
-
-        //let res = new Evented_Class();
-        // or make it thenable?
-
-
-
-
-        //res.unpaged = false;
-
-        // be able to stop the observable.
-        //  means telling it to stop on the server too.
-        //  will send a stop command command.
-
-
-        // could just use a depaging observer in some cases.
-        //  may be a bit lower perf but simpler, more logical code.
-
-
-        //let send_message_receipt = this.send_message_receipt;
-        // [message_type, pos] = xas2.read(buf_message, pos);
-        //let page_number = 0;
-        // the message will contain the message idx, the message type, and then maybe further options.
-        //
-
-        // No longer want decoding of records as an option here.
-        //  Should completely remove the decoding option from params.
-        //  There will be other ways to do it.
-        //  Then won't need to handle decoding on the return.
-        //   Do need to automatically unpage results???
-        //    Unpaged will be true by default.
-
-
-        //this.websocket_connection.sendBytes(buf_2);
-
-
-        //console.log('1) res.unpaged', res.unpaged);
-
-        // Incorporating a stop function.
-        //  Want it to get a response to the stop function.
-
-        //res.stop = 
-        //return res;
-
     }
 
-
     // And return options could have options that guide client-side processing, such as whether or not to decode.
-
 
     //  return options could ask for a promise rather than observable.
     // send(message_type_id, message_args, return_options, [callback])
 
-
     // Send does not decode.
-
 
     // Have a function above which is simpler still.
     //  Observable only, no callback.
@@ -1496,125 +1417,48 @@ class LL_NextLevelDB_Client extends Evented_Class {
         }
     }
 
-
-
     // obs_send_command
     //  observables are thenable anyway.
-
 
     // Would be nice if this could use a more standard observable...
     //  Meaning if it's just the one page coming back it gets handled in a standard way.
 
-
     // Does not handle unpaging here
     //  An unpaged option in fnl could help.
-
     // For the moment, have unpage in the ll specific command functionality.
 
-
-
     send_command(command_message, callback) {
-
-        // observable or callback
-        /*
-        return prom_or_cb((resolve, reject) => {
-            command_message.id = this.id_ws_req++;
-            this.websocket_client.send(command_message.buffer);
-            console.log('2) command_message.buffer', command_message.buffer);
-            this.ws_response_handlers[command_message.id] = (buf_partial_message, message_id, buf_message) => {
-                let crm = new Command_Response_Message(buf_message);
-                resolve(crm.value);
-            }
-        }, callback);
-        */
-
         //console.log('send_command callback', !!callback);
         // Need to deal with unpaging here.
         //  optional unpaging processor?
         //   obs_or_cb handling that?
         //   seems best not to for the moment.
-
-        // obs_or_cb_unpaged
-
         return obs_or_cb((next, complete, error) => {
             //console.log('obs_or_cb');
             command_message.id = this.id_ws_req++;
             //console.log('2) command_message.buffer', command_message.buffer);
             this.websocket_client.send(command_message.buffer);
-
             this.ws_response_handlers[command_message.id] = (buf_partial_message, message_id, buf_message) => {
-
                 //console.log('* buf_message', buf_message);
                 // the message / paging type
                 //  only, flow, last
-
                 let crm = new Command_Response_Message(buf_message);
-
                 // just pass on the response message.
                 //  It would go to unpage though.
-
                 // RECORD_PAGING_NONE
-
                 // Then is_last should not be relevant.
-
                 //console.log('crm.paged', crm.paged);
-
-
+                // Check for error return message?
                 if (crm.paged) {
+                    // send receipt.
+                    this.send_message_receipt(crm.id, crm.page_number);
                     crm.is_last ? [next(crm.value), complete()] : next(crm.value);
                 } else {
                     complete(crm.value);
                 }
-
-
-
-                //console.log('crm.id', crm.id);
-                //console.log('crm.is_last', crm.is_last);
-                // want to decode it here I think.
-                //  Keeping data encoded would have some uses though, such as getting back messages.
-
-
-
-
-
-
-
-                //console.log('pre crm value');
-
-                // no, don't decode the value.
-
-
-                //  instead 
-
-                // unpaging here....
-
-
-
-
-                //console.log('crm.value', crm.value);
-
-                //console.log('message_type_id', crm.message_type_id);
-
-
-                //console.log('crm.is_last', crm.is_last);
-
-                // no, need to unpage it.?
-                //  unpaged by default will be true.
-
-
-                //crm.is_last ? [next(crm.value), last()] : next(crm.value);
-
-                //last(crm.value);
             }
             return [];
         }, callback);
-
-
-
-        /*
-        
-        */
-
     }
 
     // change to send_command(command, opt_cb)
@@ -1834,8 +1678,7 @@ class LL_NextLevelDB_Client extends Evented_Class {
 
     ll_get_records_by_key_prefix_up_to(key_prefix, limit, callback) {
 
-
-
+        /*
         var buf_kp = xas2(key_prefix).buffer;
         var buf_0 = Buffer.alloc(1);
         buf_0.writeUInt8(0, 0);
@@ -1845,7 +1688,9 @@ class LL_NextLevelDB_Client extends Evented_Class {
 
         var buf_l = Buffer.concat([buf_kp, buf_0]);
         var buf_u = Buffer.concat([buf_kp, buf_1]);
+        */
 
+        let [buf_l, buf_u] = kp_to_range(xas2(key_prefix).buffer);
         this.ll_get_records_in_range_up_to(buf_l, buf_u, limit, callback);
     }
 
@@ -1947,10 +1792,6 @@ class LL_NextLevelDB_Client extends Evented_Class {
             //callback = a[2];
             //throw 'stop';
         } else {
-
-
-
-
             console.trace();
             throw 'Unexpected sig to ll_get_keys_by_key_prefix, sig: ' + sig;
         }
@@ -2038,44 +1879,26 @@ class LL_NextLevelDB_Client extends Evented_Class {
 
 
         } else if (sig === '[B,B,o,b]') {
-
             // Could even have a server-side option to remove the KPs. This would save data in transit.
-
-
             var buf_command = xas2(LL_GET_KEYS_IN_RANGE).buffer;
             var buf_query = Buffer.concat([buf_command, paging.buffer, xas2(buf_l.length).buffer, buf_l, xas2(buf_u.length).buffer, buf_u]);
 
             let obs = this.observe_send_binary_message(buf_query, decode);
             return obs;
-
-
-
         } else if (sig === '[B,B,o,b,b]') {
-
             // Could even have a server-side option to remove the KPs. This would save data in transit.
-
-
             var buf_command = xas2(LL_GET_KEYS_IN_RANGE).buffer;
             var buf_query = Buffer.concat([buf_command, paging.buffer, xas2(buf_l.length).buffer, buf_l, xas2(buf_u.length).buffer, buf_u]);
             console.log('remove_kp', remove_kp);
             let obs = this.observe_send_binary_message(buf_query, decode, remove_kp);
             return obs;
-
-
-
         } else {
             console.log('sig', sig);
 
             console.log('a', a);
             throw 'NYI';
         }
-
-
-
     }
-
-
-
 
     // Think we will need to get the paging right in order to retrieve the large numbers of trades.
     //  Incremental loading would be better to see in a browser too.
@@ -2190,68 +2013,13 @@ class LL_NextLevelDB_Client extends Evented_Class {
 
 
         //let cm = new Command_Message(LL_GET_RECORDS_IN_RANGE, [buf_l, buf_u], 1024);
+
+
+        // Send_command should send the response messages?
+
+
         return obs_or_cb(unpage(this.send_command(new Command_Message(LL_GET_RECORDS_IN_RANGE, [buf_l, buf_u], 1024))), callback);
     }
-
-    _ll_get_records_in_range(buf_l, buf_u, paging, decode = false, remove_kps = false, callback) {
-        let a = arguments,
-            sig = get_a_sig(a);
-
-        console.log('ll_get_records_in_range sig', sig);
-
-        // Possibly there will be a decode option too.
-
-
-        if (sig === '[B,B,f]') {
-            paging = new Paging.None();
-            callback = a[2];
-        } else if (sig === '[B,B]') {
-            //paging = new Paging.None();
-            //callback = a[2];
-        } else if (sig === '[B,B,o]') {
-            //paging = new Paging.None();
-        } else if (sig === '[B,B,o,f]') {
-            //paging = new Paging.None();
-            callback = a[3];
-        } else if (sig === '[B,B,o,b,f]') {
-            callback = a[4];
-            remove_kps = false
-            //paging = new Paging.None();
-            //callback = a[3];
-        } else if (sig === '[B,B,o,b]') {
-            //paging = new Paging.None();
-            //callback = a[3];
-        } else if (sig === '[B,B,o,b,b,f]') {
-            //paging = new Paging.None();
-            //callback = a[3];
-        } else {
-            console.log('sig', sig);
-            console.trace();
-            throw 'stop';
-        }
-
-        const default_record_page_size = 8192;
-        paging = paging || new Paging.Record(default_record_page_size);
-        var buf_command = xas2(LL_GET_RECORDS_IN_RANGE).buffer;
-        var buf_query = Buffer.concat([buf_command, paging.buffer, xas2(buf_l.length).buffer, buf_l, xas2(buf_u.length).buffer, buf_u]);
-
-        // Build the command, use send_command.
-
-        if (callback) {
-            this.send_binary_message(buf_query, RECORD_PAGING_NONE, decode, remove_kps, (err, res_binary_message) => {
-                if (err) {
-                    callback(err);
-                } else {
-                    callback(null, res_binary_message);
-                }
-            });
-
-        } else {
-            console.log('no cb');
-            return this.observe_send_binary_message(buf_query, decode, remove_kps);
-        }
-    }
-
 
     ll_get_records_in_range_up_to(buf_l, buf_u, limit, callback) {
         // table prefix number, then the rest of the pk
@@ -2290,6 +2058,12 @@ class LL_NextLevelDB_Client extends Evented_Class {
         this.cb_send_command(LL_GET_FIRST_KEY_BEGINNING, buf_beginning, callback);
     }
     ll_get_last_key_beginning(buf_beginning, callback) {
+
+        // send_command
+        //  optional callback there.
+
+
+
         this.cb_send_command(LL_GET_LAST_KEY_BEGINNING, buf_beginning, callback);
     }
 
@@ -2360,6 +2134,8 @@ class LL_NextLevelDB_Client extends Evented_Class {
 
         var buf_l = Buffer.concat([buf_beginning, buf_0]);
         var buf_u = Buffer.concat([buf_beginning, buf_1]);
+
+
 
         this.ll_count_keys_in_range(buf_l, buf_u, callback);
     }
@@ -2489,9 +2265,7 @@ class LL_NextLevelDB_Client extends Evented_Class {
     }
 
     ll_get_record(buf_key, callback) {
-
         //return prom_or_cb
-
         return cb_to_prom_or_cb((callback) => {
             //console.log('ll_get_record');
             //console.log('buf_key', buf_key);
@@ -2518,8 +2292,6 @@ class LL_NextLevelDB_Client extends Evented_Class {
                 }
             });
         }, callback)
-
-
     }
 
     // Getting table fields data to the client, 
@@ -2571,14 +2343,9 @@ class LL_NextLevelDB_Client extends Evented_Class {
                     callback(null, table_fields_info);
                 }
             });
-
         }
     }
-
-
     // May need a paged version of this soon.
-
-
 
     /**
      * 
@@ -2681,8 +2448,6 @@ class LL_NextLevelDB_Client extends Evented_Class {
         }
         //throw 'stop';
         // Can be given a paging param rather than 
-
-
         // Could be called without a callback, meaning we get an observer back.
 
         if (callback) {
@@ -2694,7 +2459,6 @@ class LL_NextLevelDB_Client extends Evented_Class {
                 } else {
                     var count, pos = 0;
                     // Read that it's got no paging too
-
                     // Could strip that page variable previously.
 
                     if (return_message_type) {
@@ -2706,9 +2470,7 @@ class LL_NextLevelDB_Client extends Evented_Class {
             });
         } else {
             //console.log('ll_count_records with observer');
-
             // would 
-
             if (!paging instanceof Paging) paging = new Paging.Timed(paging);
             //console.log('paging', paging);
             buf_query = Buffer.concat([xas2(LL_COUNT_RECORDS).buffer, paging.buffer]);
@@ -2716,7 +2478,6 @@ class LL_NextLevelDB_Client extends Evented_Class {
             return obs_msg;
         }
     }
-
 
     // Need most of the functionality on the server
     //  Just send the record over, server handles the details.
@@ -2726,63 +2487,23 @@ class LL_NextLevelDB_Client extends Evented_Class {
     // Will have more efficient way to ensure multiple records at once.
     //  Dealing with sets of records and observables that produce them will help.
 
-
-
-
-
-
     ensure_record(b_record, callback) {
-
-
-
         // Just one message in an array.
-        //  Want to be able to decode that record internally.
-
-
-
+        //  Can decode that record internally.
         let cm = new Command_Message(ENSURE_RECORD, [b_record]);
-
-
         return this.send_command(cm, callback);
-        // Think about send_command being able to deal with pages of results.
-        //  And could have setup_result_handlers function.
-        //   observable_send... could use that instead, move the code.
-
-
-
-
-        /*
- 
-        return prom_or_cb((resolve, reject) => {
-            // construct the Command_Message
- 
-            let cm = new Command_Message(ENSURE_RECORD, b_record);
-            
-            // Or could do try/catcg with the command?
- 
- 
- 
-            resolve(this.send_command(cm));
- 
- 
-        }, callback);
- 
-        */
     }
+
+    // Ensure records.
+    //  Create multiple active records at once.
+
 
     ensure_table_record(table_id, b_record, callback) {
         //console.log('table_id', table_id);
         let cm = new Command_Message(ENSURE_TABLE_RECORD, [table_id, b_record]);
         //console.log('cm', cm);
         return this.send_command(cm, callback);
-
-
-
     }
-
-
-
-
 
     // another put function. would load the data into the OO class thing.
 
@@ -2798,10 +2519,8 @@ class LL_NextLevelDB_Client extends Evented_Class {
         // PUT_RECORDS
 
         // Output decoding looks like it would be useful here.
-
         var buf_query = Buffer.concat([xas2(LL_PUT_RECORDS).buffer, buf_records]);
         //console.log('buf_query', buf_query);
-
         this.send_binary_message(buf_query, (err, res_binary_message) => {
             if (err) {
                 callback(err);
@@ -2832,16 +2551,12 @@ class LL_NextLevelDB_Client extends Evented_Class {
 
         var unsubscribe = this.send_binary_subscription_message(buf_query, (sub_event) => {
             //console.log('sub_event', sub_event);
-
             // still a low level function.
             //  just deals with the binary data.
-
             // And a higher level wrapper would process / decode these subscription events.
             subscription_event_callback(sub_event);
-
         });
         return unsubscribe;
-
     }
 
     'ensure_table'(arr_table, callback) {
@@ -2884,8 +2599,6 @@ class LL_NextLevelDB_Client extends Evented_Class {
 
         let buf_encoded_tables = Binary_Encoding.flexi_encode_item(arr_tables);
         var buf_query = Buffer.concat([xas2(ENSURE_TABLES).buffer, buf_encoded_tables]);
-
-
         // Need to have the server deal with the observer version.
         //  Nicer to have a message for each table.
         //console.log('decode', decode);
@@ -2908,7 +2621,6 @@ class LL_NextLevelDB_Client extends Evented_Class {
             }
             */
         }
-
     }
 
     'table_exists'(table_name, callback) {
@@ -2922,14 +2634,10 @@ class LL_NextLevelDB_Client extends Evented_Class {
         // return cb_to_prom_or_cb(promise_send(new Command_Message(TABLE_EXISTS, table_name)), callback);
         //  One way that over 10 lines can be reduced to 1.
 
-
-
         let inner = (icb) => {
             let buf_encoded = Binary_Encoding.flexi_encode_item(table_name);
             var buf_query = Buffer.concat([xas2(TABLE_EXISTS).buffer, buf_encoded]);
-
             // this.pr_send()
-
             this.send_binary_message(buf_query, (err, exists) => {
                 if (err) {
                     icb(err);
@@ -2945,8 +2653,6 @@ class LL_NextLevelDB_Client extends Evented_Class {
             // Return a promise / observer / another resolvable.
             throw 'NYI';
         }
-
-
     }
 
     // Maintaining a cache, rather than memoization would be best.
@@ -2954,16 +2660,13 @@ class LL_NextLevelDB_Client extends Evented_Class {
 
     'get_table_id_by_name'(table_name, callback) {
         console.log('get_table_id_by_name table_name', table_name);
-
         let cache = this.table_id_by_name_cache = this.table_id_by_name_cache || {};
         let cached;
         let inner = (icb) => {
-
             cached = cache[table_name];
             if (typeof cached === 'undefined') {
                 let buf_encoded = Binary_Encoding.flexi_encode_item(table_name);
                 var buf_query = Buffer.concat([xas2(TABLE_ID_BY_NAME).buffer, buf_encoded]);
-
                 console.log('pre table id lookup');
                 this.send_binary_message(buf_query, BINARY_PAGING_NONE, true, (err, table_id) => {
                     if (err) {
@@ -2979,7 +2682,6 @@ class LL_NextLevelDB_Client extends Evented_Class {
                     icb(null, cached);
                 })
             }
-
         }
         if (callback) {
             inner(callback);
@@ -3334,12 +3036,8 @@ if (require.main === module) {
                 obs.on('next', data => {
                     console.log('test_get_records_in_ranges data', data);
                 });
-
-
             }
             test_get_records_in_ranges();
-
-
 
             /*
             lc.ll_count_records((err, count) => {
@@ -3350,8 +3048,6 @@ if (require.main === module) {
                 }
             })
             */
-
-
         }
     });
     //console.log('pre get all');
