@@ -465,12 +465,12 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
 
         // can we load multiple tables at once from the server into one buffer?
         // or load the tables individually.
-        var that = this;
+        //var that = this;
         this.load_core((err, model) => {
             if (err) {
                 callback(err);
             } else {
-                that.load_tables(arr_table_names, callback);
+                this.load_tables(arr_table_names, callback);
                 // Test that the core has loaded successfully?
                 //throw 'stop';
                 // try loading a single table from the model.
@@ -544,7 +544,6 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
                 callback(err);
             } else {
                 console.log("validation", validation);
-
                 if (validation === "0 index rows") {
                     // build the table index.
                     //  have we got that table loaded into the model?
@@ -926,14 +925,159 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
     //  More complex server-side functionality will allow yet more complex and useful queies to take place server-side.
     //  
 
-    get_table_records(table_name, paging, decode = true, remove_kps = true, callback) {
+    // no decode or remove kps option.
+    // make it into an observable without these options.
+
+
+
+    get_table_records(table_name, paging, callback) {
+        console.log('get_table_records');
+
+        // always_plural
+
+        return obs_or_cb((next, complete, error) => {
+
+            (async () => {
+                let page_size = 32768;
+
+                let a = arguments,
+                    sig = get_a_sig(a),
+                    table_kp;
+
+                if (sig === '[s]') {
+                    // Record paging, size 1024
+
+
+                    //let page_size = 1024;
+
+                    paging = new Paging.Record(page_size);
+                    table_kp = await this.get_table_kp_by_name(table_name);
+
+
+                } else if (sig === '[s,f]') {
+                    table_kp = await this.get_table_kp_by_name(table_name);
+                    callback = a[1];
+                    paging = new Paging.Record(page_size);;
+                } else {
+                    console.trace();
+                    throw 'Unexpected sig to get_table_records: ' + sig;
+                }
+
+                console.log('sig', sig);
+                console.log('table_kp', table_kp);
+
+                let obs = this.get_records_by_key_prefix(table_kp, paging);
+                //obs.unpaged = obs_res.unpaged;
+                obs.on('next', data => {
+                    console.log('data', data);
+                    //console.log('data.decoded', data.decoded);
+                    next(data);
+                });
+                obs.on('complete', data => {
+                    complete();
+                });
+                obs.on('error', err => {
+                    error(err);
+                });
+                //obs_res.stop = obs.stop;
+
+                return [obs.stop];
+
+                //
+
+
+            })();
+
+            return [];
+
+
+
+
+        }, callback, true);
+
+        
 
 
         // Should possibly remove the table KPs.
         //  Doing this on a Buffer would be quite useful maybe.
-
-
         // With optional decoding too...
+        //  possible limit in paging option
+
+        // table, paging
+
+        // can get table id, or name
+
+
+
+
+
+        //console.log('get_table_records sig', sig);
+        //throw 'stop';
+
+        // this.get_records_by_key_prefix
+
+
+
+
+
+        //let page_size = 8192;
+
+
+
+
+
+
+        /*
+        let obs_res = new Evented_Class();
+        this.get_table_kp_by_name(table_name, (err, kp) => {
+            if (err) {
+                callback(err);
+            } else {
+                //console.log('kp', kp);
+                // Should also use an observable version of this, though the version with the callback would also be useful.
+
+                if (callback) {
+
+                    // Remove table kps from records when decoding.
+                    this.get_records_by_key_prefix(kp, decode, remove_kps, callback);
+
+                } else {
+                    //console.log('paging', paging);
+
+                    //throw 'stop';
+
+                    let obs = this.get_records_by_key_prefix(kp, paging, decode, remove_kps);
+                    obs.unpaged = obs_res.unpaged;
+                    obs.on('next', data => {
+                        console.log('data', data);
+                        console.log('data.decoded', data.decoded);
+                        obs_res.raise('next', data);
+                    });
+                    obs.on('complete', data => {
+                        obs_res.raise('complete', data);
+                    });
+                    obs_res.stop = obs.stop;
+                }
+            }
+        });
+        */
+        //if (!callback) {
+        //    return obs_res;
+        //}
+    }
+
+    _get_table_records(table_name, paging, decode = true, remove_kps = true, callback) {
+
+
+        // Should possibly remove the table KPs.
+        //  Doing this on a Buffer would be quite useful maybe.
+        // With optional decoding too...
+        //  possible limit in paging option
+
+        // table, paging
+
+        // can get table id, or name
+
 
 
         //let page_size = 8192;
@@ -980,7 +1124,7 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
             if (err) {
                 callback(err);
             } else {
-
+                //console.log('kp', kp);
                 // Should also use an observable version of this, though the version with the callback would also be useful.
 
                 if (callback) {
@@ -996,6 +1140,8 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
                     let obs = this.get_records_by_key_prefix(kp, paging, decode, remove_kps);
                     obs.unpaged = obs_res.unpaged;
                     obs.on('next', data => {
+                        console.log('data', data);
+                        console.log('data.decoded', data.decoded);
                         obs_res.raise('next', data);
                     });
                     obs.on('complete', data => {
@@ -1648,19 +1794,26 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
     }
 
     get_table_kp_by_name(table_name, callback) {
-        //console.log('get_table_kp_by_name table_name', table_name);
-        this.get_table_id_by_name(table_name, (err, id) => {
-            if (err) {
-                callback(err);
-            } else {
-                // 
 
-                //console.log('');
-                //console.log('***id', id);
-                //console.log('');
-                callback(null, id * 2 + 2);
-            }
-        });
+        return prom_or_cb((resolve, reject) => {
+
+            this.get_table_id_by_name(table_name, (err, id) => {
+                if (err) {
+                    reject(err);
+                } else {
+                    // 
+    
+                    //console.log('');
+                    //console.log('***id', id);
+                    //console.log('');
+                    resolve(id * 2 + 2);
+                }
+            });
+
+        }, callback);
+
+        //console.log('get_table_kp_by_name table_name', table_name);
+        
     }
 
 
@@ -1811,7 +1964,10 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
                         } else {
                             //console.log('fields_records', fields_records);
 
-                            let res_keys = [], res_values = [], res = [res_keys, res_values], is_pk;
+                            let res_keys = [],
+                                res_values = [],
+                                res = [res_keys, res_values],
+                                is_pk;
 
                             // So the fields records just have values...?
                             each(fields_records, record => {
@@ -1848,7 +2004,7 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
                     is_pk = record[1][2];
                     if (is_pk) {
                         res++;
-                    } else { }
+                    } else {}
                 });
                 callback(null, res);
             }

@@ -5,14 +5,14 @@
     "dependencies": {
         "arr-table": "^0.0.5",
         "binary-encoding": "^0.0.57",
-        "lang-mini": "^0.0.6",
-        "moment": "^2.21.0",
+        "lang-mini": "^0.0.8",
+        "moment": "^2.22.2",
         "my-config": "^2.0.0",
-        "nextleveldb-model": "^0.0.68",
+        "nextleveldb-model": "^0.0.69",
         "recursive-readdir": "^2.2.2",
-        "request": "^2.85.0",
+        "request": "^2.88.0",
         "single-line-log": "^1.1.2",
-        "ws": "^5.1.0",
+        "ws": "^6.0.0",
         "xas2": "^0.0.17"
     },
     "engines": {
@@ -24,5 +24,5 @@
         "type": "git",
         "url": "https://github.com/metabench/nextleveldb-client.git"
     },
-    "version": "0.0.72"
+    "version": "0.0.73"
 }

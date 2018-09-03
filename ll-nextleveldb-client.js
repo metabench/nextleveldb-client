@@ -1582,7 +1582,7 @@ class LL_NextLevelDB_Client extends Evented_Class {
 
         //const obs_default_paging = new Paging.Count(1024);
 
-        //console.log('ll_get_records_by_key_prefix sig', sig);
+        console.log('ll_get_records_by_key_prefix sig', sig);
 
         if (sig === '[n,o]') {
             buf_key_prefix = xas2(key_prefix).buffer;
