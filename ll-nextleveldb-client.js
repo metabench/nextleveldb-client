@@ -1054,6 +1054,15 @@ class LL_NextLevelDB_Client extends Evented_Class {
     // see send_paged_command
     //  hopefully that can be used instead in a number of places.
 
+
+    // Unpage and decode functions would help.
+    //  Better to move away from observe_send_binary_message
+    //  Just use send.
+
+
+    /*
+
+
     observe_send_binary_message(message, decode = false, remove_kp = false, str_result_grouping = '') {
         let a = arguments,
             sig = get_a_sig(arguments);
@@ -1140,8 +1149,6 @@ class LL_NextLevelDB_Client extends Evented_Class {
                     }
                     if (message_type === BINARY_PAGING_LAST) {
                         console.log('BINARY_PAGING_LAST');
-
-
                         [page_number, pos] = xas2.read(obj_message, pos);
                         var buf_the_rest = Buffer.alloc(obj_message.length - pos);
                         obj_message.copy(buf_the_rest, 0, pos);
@@ -1360,6 +1367,8 @@ class LL_NextLevelDB_Client extends Evented_Class {
         return res;
     }
 
+    */
+
     // And return options could have options that guide client-side processing, such as whether or not to decode.
 
     //  return options could ask for a promise rather than observable.
@@ -1404,6 +1413,8 @@ class LL_NextLevelDB_Client extends Evented_Class {
 
     // just send the command message....
 
+    /*
+
     send(message_type_id, message_args, return_options, callback) {
         return_options = return_options || new Paging.Record_Paging(1024);
         return_options.remove_kps = true;
@@ -1416,6 +1427,7 @@ class LL_NextLevelDB_Client extends Evented_Class {
             return obs_res;
         }
     }
+    */
 
     // obs_send_command
     //  observables are thenable anyway.
@@ -1443,17 +1455,22 @@ class LL_NextLevelDB_Client extends Evented_Class {
                 // the message / paging type
                 //  only, flow, last
                 let crm = new Command_Response_Message(buf_message);
-                // just pass on the response message.
-                //  It would go to unpage though.
-                // RECORD_PAGING_NONE
-                // Then is_last should not be relevant.
-                //console.log('crm.paged', crm.paged);
-                // Check for error return message?
+                crm.singular_result = command_message.singular_result;
+
+                //console.log('crm.is_last', crm.is_last);
+
+
                 if (crm.paged) {
                     // send receipt.
+                    //console.log('crm.value', crm.value);
                     this.send_message_receipt(crm.id, crm.page_number);
+
+
+
+
                     crm.is_last ? [next(crm.value), complete()] : next(crm.value);
                 } else {
+                    
                     complete(crm.value);
                 }
             }
@@ -1582,7 +1599,7 @@ class LL_NextLevelDB_Client extends Evented_Class {
 
         //const obs_default_paging = new Paging.Count(1024);
 
-        console.log('ll_get_records_by_key_prefix sig', sig);
+        //console.log('ll_get_records_by_key_prefix sig', sig);
 
         if (sig === '[n,o]') {
             buf_key_prefix = xas2(key_prefix).buffer;
@@ -2017,6 +2034,7 @@ class LL_NextLevelDB_Client extends Evented_Class {
 
         // Send_command should send the response messages?
 
+        // Unpaging getting rid of the empty array?
 
         return obs_or_cb(unpage(this.send_command(new Command_Message(LL_GET_RECORDS_IN_RANGE, [buf_l, buf_u], 1024))), callback);
     }
@@ -2167,6 +2185,28 @@ class LL_NextLevelDB_Client extends Evented_Class {
      * @memberof LL_NextLevelDB_Client
      */
     ll_count_keys_in_range(buf_l, buf_u, limit = -1, callback) {
+
+
+        // command message where we know there is a single response result.
+        //  single finished result. paged updates.
+
+        
+
+
+
+
+        let cm = new Command_Message(LL_COUNT_KEYS_IN_RANGE, [buf_l, buf_u, limit], 1024);
+        cm.singular_result = true;
+        return this.send_command(cm, callback);
+
+
+        // Build up the command.
+        // Send it.
+
+        //
+
+
+        /*
         let a = arguments,
             l = a.length;
         if (l === 3) {
@@ -2221,8 +2261,17 @@ class LL_NextLevelDB_Client extends Evented_Class {
             // Observe send binart message could have nicer message encoding.
             //  could use .send
             //console.log('pre obs send');
+
+            // and return a single object with then?
+            //  always singular?
+
+            // need to indicate on some observable calls that it's always a singular result.
+
+
+
             return this.observe_send_binary_message(buf_query, true);
         }
+        */
     }
 
 
@@ -2349,7 +2398,6 @@ class LL_NextLevelDB_Client extends Evented_Class {
 
     /**
      * 
-     * 
      * @param {any} paging 
      * @param {any} callback 
      * @memberof LL_NextLevelDB_Client
@@ -2366,11 +2414,7 @@ class LL_NextLevelDB_Client extends Evented_Class {
 
 
     'll_get_all_keys'(paging, decode = false) {
-
         // Could use fn sigs, maybe will call this with a callback function.
-
-
-
 
         let a = arguments;
         a.l = a.length;
@@ -2402,8 +2446,6 @@ class LL_NextLevelDB_Client extends Evented_Class {
         // use an observer instead.
         //  Maybe just in the case of paging.
 
-
-
         var buf_query, pos = 0;
         if (!paging instanceof Paging) paging = new Paging.Record_Paging(paging);
         buf_query = Buffer.concat([xas2(LL_GET_ALL_KEYS).buffer, paging.buffer]);
@@ -2417,10 +2459,7 @@ class LL_NextLevelDB_Client extends Evented_Class {
     // will need to handle multiple callbacks.
     //  still do send_binary_message, but expect multiple callbacks?
 
-
-
     /**
-     * 
      * 
      * @param {any} callback 
      * @memberof LL_NextLevelDB_Client
@@ -2547,8 +2586,6 @@ class LL_NextLevelDB_Client extends Evented_Class {
         //console.log('buf_kp', buf_kp);
         //console.log('1) buf_kp hex', buf_kp.toString('hex'));
         var buf_query = Buffer.concat([xas2(LL_SUBSCRIBE_KEY_PREFIX_PUTS).buffer, buf_kp]);
-
-
         var unsubscribe = this.send_binary_subscription_message(buf_query, (sub_event) => {
             //console.log('sub_event', sub_event);
             // still a low level function.
@@ -2561,7 +2598,6 @@ class LL_NextLevelDB_Client extends Evented_Class {
 
     'ensure_table'(arr_table, callback) {
         // arr_table could be multiple tables.
-
         let a = arguments,
             sig = get_a_sig(a);
 
@@ -2828,8 +2864,6 @@ if (require.main === module) {
                 // Subscriptions don't get error events back?
                 //  Is that the difference?
                 //  Maybe don't do it that way for the moment.
-
-
                 lc.ll_count_records((err, count) => {
                     if (err) {
                         throw err;
@@ -2887,9 +2921,7 @@ if (require.main === module) {
 
 
                         // want a higher level get all records too.
-
                         //  maybe not really worth having the ll version?
-
                         //  may look into observable transformers.
 
 
@@ -2959,7 +2991,6 @@ if (require.main === module) {
                 // count_table_records seems like a convenient function to make lower level within the server.
                 //  
 
-
                 let obs_count = lc.count_table_records('bittrex market summary snapshots');
                 console.log('obs_count', obs_count);
                 obs_count.subscribe('next', (res) => {
@@ -3008,7 +3039,6 @@ if (require.main === module) {
                         console.log('fields_info', fields_info);
                         each(fields_info, field_info => {
                             console.log('field_info', JSON.stringify(field_info));
-
                         });
                     }
                 })
@@ -3018,9 +3048,6 @@ if (require.main === module) {
 
             let test_get_records_in_ranges = () => {
                 console.log('test_get_records_in_ranges');
-
-
-
 
                 let buf_0 = Buffer.alloc(1);
                 buf_0.writeUInt8(0, 0);

@@ -818,7 +818,7 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
                 }
             });
         } else {
-            console.log('ll count')
+            //console.log('ll count')
             return this.ll_count_keys_in_range(buf_l, buf_u);
         }
     }
