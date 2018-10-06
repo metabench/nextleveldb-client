@@ -705,12 +705,12 @@ class LL_NextLevelDB_Client extends Evented_Class {
         //  See if the server can interpret one of them as the other.
         //   Change it so we only use 1 of them, then get rid of the other.
         let message_id = this.id_ws_req++;
-        console.log('send_paged_command command_id', command_id);
+        //console.log('send_paged_command command_id', command_id);
         // encode the message with the params.
         let return_options = new Paging.Count_Paging(1024);
         let buf_msg = Buffer.concat([xas2(message_id).buffer, xas2(command_id).buffer, return_options.buffer, Binary_Encoding.encode_to_buffer(params)]);
 
-        console.log('buf_msg', buf_msg);
+        //console.log('buf_msg', buf_msg);
         this.websocket_client.send(buf_msg);
         //return res;
         // And want a simple return message processor.
@@ -735,11 +735,11 @@ class LL_NextLevelDB_Client extends Evented_Class {
                 // Now more use of Binary_Encoding with its greater functionality.
                 response_message = new Command_Response_Message(Buffer.concat([xas2(message_id).buffer, obj_message]));
             }
-            console.log('response_message', response_message);
+            //console.log('response_message', response_message);
             // response_message.items
             //  response_message.value
-            console.log('response_message.value.length', response_message.value.length);
-            console.log('response_message.kv_buffers', response_message.kvp_buffers);
+            //console.log('response_message.value.length', response_message.value.length);
+            //console.log('response_message.kv_buffers', response_message.kvp_buffers);
             res.raise('next', response_message.value_buffer);
             //console.log('response_message.is_last', response_message.is_last);
             if (response_message.is_last) {
@@ -1518,6 +1518,12 @@ class LL_NextLevelDB_Client extends Evented_Class {
     // Make this one return an observable for the moment.
 
     ll_get_all_records(paging, decode = false) {
+
+
+        // use Command and send_command instead.
+
+        let cm = new Command_Message(LL_GET_ALL_RECORDS, )
+
         var buf_query, pos = 0;
         if (!paging instanceof Paging) paging = new Paging.Record_Paging(paging);
         buf_query = Buffer.concat([xas2(LL_GET_ALL_RECORDS).buffer, paging.buffer]);
@@ -1712,8 +1718,6 @@ class LL_NextLevelDB_Client extends Evented_Class {
     }
 
     /**
-     * 
-     * 
      * @param {buffer} buf_beginning 
      * @param {any} callback 
      * @memberof LL_NextLevelDB_Client
@@ -1838,7 +1842,6 @@ class LL_NextLevelDB_Client extends Evented_Class {
 
     /**
      * 
-     * 
      * @param {buffer} buf_l 
      * @param {buffer} buf_u 
      * @param {any} callback 
@@ -1882,7 +1885,6 @@ class LL_NextLevelDB_Client extends Evented_Class {
             var buf_command = xas2(LL_GET_KEYS_IN_RANGE).buffer;
             var buf_query = Buffer.concat([buf_command, paging.buffer, xas2(buf_l.length).buffer, buf_l, xas2(buf_u.length).buffer, buf_u]);
             callback = a[2];
-
 
             this.send_binary_message(buf_query, (err, res_binary_message) => {
                 if (err) {
@@ -2870,11 +2872,8 @@ if (require.main === module) {
                     } else {
                         //console.log('count', count);
                         // want a higher level get all records too.
-
                         //  maybe not really worth having the ll version?
-
                         //  may look into observable transformers.
-
 
                         let decode = true;
                         let obs = lc.ll_get_all_records(new Paging.Record_Paging(64), decode);
@@ -2919,12 +2918,9 @@ if (require.main === module) {
                     } else {
                         console.log('count', count);
 
-
                         // want a higher level get all records too.
                         //  maybe not really worth having the ll version?
                         //  may look into observable transformers.
-
-
 
                         let decode = true;
 
@@ -2947,7 +2943,6 @@ if (require.main === module) {
 
                         });
                         // Paged get records is good for copying data from one db to another.
-
                     }
                 })
             };
