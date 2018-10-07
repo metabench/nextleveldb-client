@@ -1187,8 +1187,11 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
 
 
     get_table_records_by_key(table_name, key, callback) {
-        let kp = this.model.map_tables_by_id[this.model.table_id(table_name)].kp;
-        let buf_key = Model_Database.encode_key(kp, key);
+        //let kp = this.model.map_tables_by_id[this.model.table_id(table_name)].kp;
+        //let buf_key = Model_Database.encode_key(kp, key);
+
+        //let kp = ;
+        //let buf_key = ;
         //console.log('kp', kp);
         //console.log('buf_key', buf_key);
         //console.log('callback', callback);
@@ -1196,8 +1199,27 @@ class NextlevelDB_Client extends LL_NextlevelDB_Client {
         // then search by key (prefix)
         //  it's the beginning of the key.
 
-        return this.get_records_by_key_prefix(buf_key, callback);
+        return this.get_records_by_key_prefix(Model_Database.encode_key(this.model.map_tables_by_id[this.model.table_id(table_name)].kp, key), callback);
     }
+
+
+    // get_table_first_last_records_by_key
+    get_table_first_last_records_by_key(table_name, key, callback) {
+        //let kp = this.model.map_tables_by_id[this.model.table_id(table_name)].kp;
+        //let buf_key = Model_Database.encode_key(kp, key);
+
+        //let kp = ;
+        //let buf_key = ;
+        //console.log('kp', kp);
+        //console.log('buf_key', buf_key);
+        //console.log('callback', callback);
+
+        // then search by key (prefix)
+        //  it's the beginning of the key.
+
+        return this.get_first_last_records_by_key_prefix(Model_Database.encode_key(this.model.map_tables_by_id[this.model.table_id(table_name)].kp, key), callback);
+    }
+
 
 
     // Client side remove_kp options?

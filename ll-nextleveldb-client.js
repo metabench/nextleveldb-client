@@ -62,6 +62,10 @@ const Command_Message = Model.Command_Message;
 const Command_Response_Message = Model.Command_Response_Message;
 const database_encoding = Model.database_encoding;
 
+const B_Key = Model.BB_Key;
+const key_range = B_Key.range;
+const buffer_key_range = B_Key.buffer_range;
+
 //console.log('encodings.poloniex.market', encodings.poloniex.market);
 const Paging = Model.Paging;
 const fs = require('fs');
@@ -82,6 +86,7 @@ const LL_GET_RECORDS_IN_RANGE = 5;
 const LL_GET_RECORDS_IN_RANGES = 50;
 const LL_COUNT_KEYS_IN_RANGE = 6;
 const LL_GET_FIRST_LAST_KEYS_IN_RANGE = 7;
+const LL_GET_FIRST_LAST_RECORDS_IN_RANGE = 27;
 // And not just in range, first and last keys beginning with something would be useful
 
 const LL_GET_FIRST_LAST_KEYS_BEGINNING = 36; // Maybe don't implement yet.
@@ -1059,10 +1064,6 @@ class LL_NextLevelDB_Client extends Evented_Class {
     //  Better to move away from observe_send_binary_message
     //  Just use send.
 
-
-    /*
-
-
     observe_send_binary_message(message, decode = false, remove_kp = false, str_result_grouping = '') {
         let a = arguments,
             sig = get_a_sig(arguments);
@@ -1366,9 +1367,6 @@ class LL_NextLevelDB_Client extends Evented_Class {
         this.websocket_client.send(buf_2);
         return res;
     }
-
-    */
-
     // And return options could have options that guide client-side processing, such as whether or not to decode.
 
     //  return options could ask for a promise rather than observable.
@@ -1410,7 +1408,6 @@ class LL_NextLevelDB_Client extends Evented_Class {
         this.websocket_client.send(buf);
     }
     // deprecate this too
-
     // just send the command message....
 
     /*
@@ -1439,6 +1436,8 @@ class LL_NextLevelDB_Client extends Evented_Class {
     //  An unpaged option in fnl could help.
     // For the moment, have unpage in the ll specific command functionality.
 
+    // send_command is the way forward.
+
     send_command(command_message, callback) {
         //console.log('send_command callback', !!callback);
         // Need to deal with unpaging here.
@@ -1448,7 +1447,11 @@ class LL_NextLevelDB_Client extends Evented_Class {
         return obs_or_cb((next, complete, error) => {
             //console.log('obs_or_cb');
             command_message.id = this.id_ws_req++;
+            //console.log('command_message.id', command_message.id);
             //console.log('2) command_message.buffer', command_message.buffer);
+            //console.log('command_message', command_message);
+            //console.log('command_message.inner', command_message.inner);
+            //console.trace();
             this.websocket_client.send(command_message.buffer);
             this.ws_response_handlers[command_message.id] = (buf_partial_message, message_id, buf_message) => {
                 //console.log('* buf_message', buf_message);
@@ -1457,20 +1460,14 @@ class LL_NextLevelDB_Client extends Evented_Class {
                 let crm = new Command_Response_Message(buf_message);
                 crm.singular_result = command_message.singular_result;
 
+                //console.log('crm.singular_result', crm.singular_result);
                 //console.log('crm.is_last', crm.is_last);
-
-
                 if (crm.paged) {
                     // send receipt.
                     //console.log('crm.value', crm.value);
                     this.send_message_receipt(crm.id, crm.page_number);
-
-
-
-
                     crm.is_last ? [next(crm.value), complete()] : next(crm.value);
                 } else {
-                    
                     complete(crm.value);
                 }
             }
@@ -1489,7 +1486,7 @@ class LL_NextLevelDB_Client extends Evented_Class {
         var idx = this.id_ws_req++,
             ws_response_handlers = this.ws_response_handlers;
         var buf_2 = Buffer.concat([xas2(idx).buffer, message]);
-        var that = this;
+        //var that = this;
 
         ws_response_handlers[idx] = function (obj_message) {
             subscription_event_callback(obj_message);
@@ -1501,7 +1498,7 @@ class LL_NextLevelDB_Client extends Evented_Class {
             var buf_query = Buffer.concat([xas2(LL_UNSUBSCRIBE_SUBSCRIPTION).buffer]);
             // Only needs to give the subscription index. That is unique per client.
             var buf_2 = Buffer.concat([xas2(idx).buffer, buf_query]);
-            that.websocket_connection.sendBytes(buf_2);
+            this.websocket_connection.sendBytes(buf_2);
 
         }
         //console.log('pre send', buf_2);
@@ -1583,7 +1580,15 @@ class LL_NextLevelDB_Client extends Evented_Class {
 
     // 
 
-    ll_get_records_by_key_prefix(key_prefix, paging, decode = false, remove_kps = false, callback) {
+    // get rid of decode and remove kps option?
+    //  can be further decode transformer on the client
+    //  easier to keep kps for consistency.
+
+    // A simplified version of this would definitely help.
+
+
+
+    ll_get_records_by_key_prefix(key_prefix, paging, callback) {
 
         // Should probably use a sig test in the client.
         //  Maybe will want decoding in the client too.
@@ -1599,8 +1604,6 @@ class LL_NextLevelDB_Client extends Evented_Class {
         let a = arguments,
             sig = get_a_sig(a);
         let buf_key_prefix;
-
-
         // With observables, default paging
 
         //const obs_default_paging = new Paging.Count(1024);
@@ -1609,7 +1612,6 @@ class LL_NextLevelDB_Client extends Evented_Class {
 
         if (sig === '[n,o]') {
             buf_key_prefix = xas2(key_prefix).buffer;
-
         } else if (sig === '[n,f]') {
             buf_key_prefix = xas2(key_prefix).buffer;
             paging = new Paging.None();
@@ -1625,7 +1627,9 @@ class LL_NextLevelDB_Client extends Evented_Class {
             paging = new Paging.None();
 
             // [n,b,f]
-        } else if (sig === '[B,b,f]') {
+        }
+        
+        /*else if (sig === '[B,b,f]') {
             buf_key_prefix = key_prefix;
             decode = a[1];
             callback = a[2];
@@ -1665,7 +1669,8 @@ class LL_NextLevelDB_Client extends Evented_Class {
             //paging = new Paging.None();
             //callback = a[2];
             //throw 'stop';
-        } else {
+        }
+        */ else {
 
             console.trace();
             throw 'Unexpected sig to ll_get_records_by_key_prefix, sig: ' + sig;
@@ -1674,6 +1679,12 @@ class LL_NextLevelDB_Client extends Evented_Class {
         //throw 'stop';
 
         //var buf_kp = xas2(key_prefix).buffer;
+
+        
+        // 
+
+        /*
+
         var buf_0 = Buffer.alloc(1);
         buf_0.writeUInt8(0, 0);
         var buf_1 = Buffer.alloc(1);
@@ -1682,6 +1693,21 @@ class LL_NextLevelDB_Client extends Evented_Class {
 
         var buf_l = Buffer.concat([buf_key_prefix, buf_0]);
         var buf_u = Buffer.concat([buf_key_prefix, buf_1]);
+        */
+        //console.log('buffer_key_range', buffer_key_range);
+
+
+        // buffer_range
+        // buffer_key_range  
+
+
+        let [key_l, key_u] = buffer_key_range(buf_key_prefix);
+        // Key_Range
+
+        // Key.range(prefix);
+
+
+
 
         //console.log('buf_l', buf_l);
         //console.log('buf_u', buf_u);
@@ -1696,8 +1722,50 @@ class LL_NextLevelDB_Client extends Evented_Class {
             //return this.ll_get_records_in_range(buf_l, buf_u, paging, decode);
         }*/
 
-        return this.ll_get_records_in_range(buf_l, buf_u, callback);
+        //return this.ll_get_records_in_range(buf_l, buf_u, callback);
+        return this.ll_get_records_in_range(key_l, key_u, callback);
     }
+
+    // get_first_last_records_by_key_prefix
+    get_first_last_records_by_key_prefix(key_prefix, callback) {
+
+        // Should probably use a sig test in the client.
+        //  Maybe will want decoding in the client too.
+        //console.log('ll_get_records_by_key_prefix');
+
+        // Expand this, and ll_get_records_in_range, so that they return an observable if no callback function is provided.
+        //  Would have a default paging option (or use the server default).
+
+        // Should call ll_get_records_in_range using an observable.
+
+        // An inner observable would be a reasonable style here.
+
+        let a = arguments,
+            sig = get_a_sig(a);
+        let buf_key_prefix;
+
+        // With observables, default paging
+
+        //const obs_default_paging = new Paging.Count(1024);
+        //console.log('ll_get_records_by_key_prefix sig', sig);
+
+        if (sig === '[n,u]') {
+            buf_key_prefix = xas2(key_prefix).buffer;
+        } else if (sig === '[B,u]') {
+            buf_key_prefix = key_prefix;
+        } else {
+            console.trace();
+            throw 'Unexpected sig to ll_get_records_by_key_prefix, sig: ' + sig;
+        }
+        //.log('buffer_key_range', buffer_key_range);
+
+        // buffer_range
+        // buffer_key_range  
+
+        let [key_l, key_u] = buffer_key_range(buf_key_prefix);
+        return this.ll_get_first_last_records_in_range(key_l, key_u, callback);
+    }
+    
 
     ll_get_records_by_key_prefix_up_to(key_prefix, limit, callback) {
 
@@ -1849,14 +1917,12 @@ class LL_NextLevelDB_Client extends Evented_Class {
      */
 
     // Best to remove decoding option, and return Buffer Backed key objects.
-
-
     ll_get_keys_in_range(buf_l, buf_u, paging, decode = false, remove_kp = false, callback) {
 
         let a = arguments;
         let sig = get_a_sig(a);
 
-        //console.log('ll_get_keys_in_range sig', sig);
+        console.log('ll_get_keys_in_range sig', sig);
 
         //throw 'stop';
 
@@ -1894,9 +1960,6 @@ class LL_NextLevelDB_Client extends Evented_Class {
                     callback(null, arr_key_buffers);
                 }
             });
-
-
-
         } else if (sig === '[B,B,o,b]') {
             // Could even have a server-side option to remove the KPs. This would save data in transit.
             var buf_command = xas2(LL_GET_KEYS_IN_RANGE).buffer;
@@ -1983,8 +2046,6 @@ class LL_NextLevelDB_Client extends Evented_Class {
         return this.send_paged_command(LL_GET_RECORDS_IN_RANGES, arr_ranges);
     }
 
-
-
     // Not so sure that this unpages the records.
     //  In general, we always want records to be unpaged when they arrive back, but need to have it as an optional part of the process.
     //   A property on the observable would help with this, as it's not a param that really is best passed into the front of the function call.
@@ -2025,20 +2086,18 @@ class LL_NextLevelDB_Client extends Evented_Class {
         // This is a change to the protocol.
         //  Newer server-side version uses Command_Message.
         //console.trace();
-        //console.log('[buf_l, buf_u]', [buf_l, buf_u]);
+        console.log('[buf_l, buf_u]', [buf_l, buf_u]);
         //throw 'stop';
 
         // get_table_records_by_keys seems like a useful core function, then get it running with the client.
 
-
-        //let cm = new Command_Message(LL_GET_RECORDS_IN_RANGE, [buf_l, buf_u], 1024);
-
+        let cm = new Command_Message(LL_GET_RECORDS_IN_RANGE, [buf_l, buf_u], 1024);
+        console.log('ll_get_records_in_range cm', cm);
 
         // Send_command should send the response messages?
-
         // Unpaging getting rid of the empty array?
 
-        return obs_or_cb(unpage(this.send_command(new Command_Message(LL_GET_RECORDS_IN_RANGE, [buf_l, buf_u], 1024))), callback);
+        return obs_or_cb(unpage(this.send_command(cm)), callback);
     }
 
     ll_get_records_in_range_up_to(buf_l, buf_u, limit, callback) {
@@ -2082,26 +2141,41 @@ class LL_NextLevelDB_Client extends Evented_Class {
         // send_command
         //  optional callback there.
 
-
-
         this.cb_send_command(LL_GET_LAST_KEY_BEGINNING, buf_beginning, callback);
     }
 
     // ll_query = send_binary_message?
 
     /**
-     * 
-     * 
      * @param {buffer} buf_l 
      * @param {buffer} buf_u 
      * @param {any} callback 
      * @memberof LL_NextLevelDB_Client
      */
     ll_get_first_last_keys_in_range(buf_l, buf_u, callback) {
+        // be able to deal with keys rather than buffers here too.
+
+        // have a buffer version.
+        //  or a more flexible concat command.
+
+        const concat = (arr) => {
+            let res = new Array(arr.length);
+            each(arr, (pbuf, c) => {
+                if (pbuf instanceof Buffer) {
+                    res[c] = pbuf;
+                } else if (pbuf instanceof B_Key) {
+                    res[c] = pbuf.buffer;
+                } else {
+                    throw 'Unexpected Object ' + pbuf;
+                }
+            })
+            return Buffer.concat(res);
+        }
+
         var paging = new Paging.None();
         var buf_command = xas2(LL_GET_FIRST_LAST_KEYS_IN_RANGE).buffer;
         // the lengths of the buffers too...
-        var buf_query = Buffer.concat([buf_command, paging.buffer, xas2(buf_l.length).buffer, buf_l, xas2(buf_u.length).buffer, buf_u]);
+        var buf_query = concat([buf_command, paging.buffer, xas2(buf_l.length).buffer, buf_l, xas2(buf_u.length).buffer, buf_u]);
         this.send_binary_message(buf_query, RECORD_PAGING_NONE, (err, res_binary_message) => {
             if (err) {
                 callback(err);
@@ -2112,9 +2186,19 @@ class LL_NextLevelDB_Client extends Evented_Class {
         });
     }
 
+    ll_get_first_last_records_in_range(buf_l, buf_u, callback) {
+
+        //console.log('[buf_l, buf_u]', [buf_l, buf_u]);
+        let cm = new Command_Message(LL_GET_FIRST_LAST_RECORDS_IN_RANGE, [buf_l, buf_u]);
+        //console.log('cm', cm);
+        //throw 'stop';
+        
+        return this.send_command(cm, callback);
+    }
+
+
+
     /**
-     * 
-     * 
      * @param {buffer} buf_beginning 
      * @param {any} callback 
      * @memberof LL_NextLevelDB_Client
@@ -2128,7 +2212,6 @@ class LL_NextLevelDB_Client extends Evented_Class {
         var buf_1 = Buffer.alloc(1);
         buf_1.writeUInt8(255, 0);
         // and another 0 byte...?
-
         var buf_l = Buffer.concat([buf_beginning, buf_0]);
         var buf_u = Buffer.concat([buf_beginning, buf_1]);
         this.ll_get_first_last_keys_in_range(buf_l, buf_u, callback);
@@ -2154,9 +2237,6 @@ class LL_NextLevelDB_Client extends Evented_Class {
 
         var buf_l = Buffer.concat([buf_beginning, buf_0]);
         var buf_u = Buffer.concat([buf_beginning, buf_1]);
-
-
-
         this.ll_count_keys_in_range(buf_l, buf_u, callback);
     }
 
@@ -2762,9 +2842,6 @@ var local_info = {
 
 // Think this requires the new version of the server code.
 
-
-
-
 if (require.main === module) {
     var config = require('my-config').init({
         path: path.resolve('../../config/config.json') //,
@@ -2917,13 +2994,10 @@ if (require.main === module) {
                         throw err;
                     } else {
                         console.log('count', count);
-
                         // want a higher level get all records too.
                         //  maybe not really worth having the ll version?
                         //  may look into observable transformers.
-
                         let decode = true;
-
                         let obs = lc.ll_get_all_keys(new Paging.Record_Paging(64), decode);
 
                         console.log('obs', obs);
@@ -2940,7 +3014,6 @@ if (require.main === module) {
                         obs.subscribe('complete', () => {
                             console.log('c', c);
                             console.log('obs complete');
-
                         });
                         // Paged get records is good for copying data from one db to another.
                     }
@@ -2954,7 +3027,6 @@ if (require.main === module) {
             }
 
             //test_paged_get_table_records();
-
             // This would be better with lots of da6ta
 
             test_timed_paging_count = () => {
