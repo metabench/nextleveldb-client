@@ -9,11 +9,11 @@
         "lang-mini": "^0.0.26",
         "moment": "^2.29.4",
         "my-config": "^2.0.0",
-        "nextleveldb-model": "^0.0.72",
-        "recursive-readdir": "^2.2.2",
+        "nextleveldb-model": "^0.0.73",
+        "recursive-readdir": "^2.2.3",
         "request": "^2.88.2",
         "single-line-log": "^1.1.2",
-        "ws": "^8.8.1",
+        "ws": "^8.10.0",
         "xas2": "^0.0.17"
     },
     "engines": {
@@ -25,5 +25,5 @@
         "type": "git",
         "url": "https://github.com/metabench/nextleveldb-client.git"
     },
-    "version": "0.0.77"
+    "version": "0.0.78"
 }
